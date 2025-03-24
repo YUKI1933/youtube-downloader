@@ -58,18 +58,12 @@
                     </div>
                 </div>
                 <div class="dropdown" id="userDropdown">
-                    <button class="px-4 py-2 hover:bg-gray-800 rounded" onclick="toggleDropdown('userDropdown')" data-i18n="userCenter">
+                    <button class="px-4 py-2 hover:bg-gray-800 rounded" onclick="toggleDropdown('userDropdown')" id="userMenuButton">
                         <span id="userDisplayName">个人中心</span>
                     </button>
                     <div class="dropdown-content">
-                        <div id="loggedOutMenu">
-                            <a href="login.html" class="dropdown-item" data-i18n="login">登录</a>
-                            <a href="register.html" class="dropdown-item" data-i18n="register">注册</a>
-                        </div>
-                        <div id="loggedInMenu" style="display: none;">
-                            <a href="#" class="dropdown-item" data-i18n="settings">设置</a>
-                            <a href="#" class="dropdown-item" onclick="logout()" data-i18n="logout">退出登录</a>
-                        </div>
+                        <a href="#" class="dropdown-item" onclick="openSettings()">设置</a>
+                        <a href="#" class="dropdown-item" onclick="logoutUser()">退出登录</a>
                     </div>
                 </div>
             </div>
@@ -91,12 +85,10 @@
                         id="urlInput"
                         class="flex-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="输入YouTube分享地址"
-                        data-i18n-placeholder="inputPlaceholder"
                     >
                     <button 
-                        onclick="analyzeVideo()"
+                        onclick="analyzeVideoDirectly()"
                         class="px-8 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors text-white"
-                        data-i18n="analyze"
                     >
                         解析
                     </button>
@@ -104,13 +96,13 @@
             </div>
 
             <div id="result" class="hidden">
-                <div class="border-t border-gray-200">
-                    <div class="flex border-b border-gray-200">
-                        <button class="tab-button px-6 py-3 flex-1 text-center hover:bg-gray-50 transition-colors" data-tab="video" onclick="showContent('video')">视频</button>
-                        <button class="tab-button px-6 py-3 flex-1 text-center hover:bg-gray-50 transition-colors" data-tab="image" onclick="showContent('image')">图片</button>
-                        <button class="tab-button px-6 py-3 flex-1 text-center hover:bg-gray-50 transition-colors" data-tab="text" onclick="showContent('text')">文字</button>
-                    </div>
-                    <div id="videoInfo" class="p-6"></div>
+                <div class="flex border-b">
+                    <button class="tab-button flex-1 py-3 px-4 text-center" data-tab="video" onclick="showContentTab('video')">视频</button>
+                    <button class="tab-button flex-1 py-3 px-4 text-center" data-tab="image" onclick="showContentTab('image')">图片</button>
+                    <button class="tab-button flex-1 py-3 px-4 text-center" data-tab="text" onclick="showContentTab('text')">文本</button>
+                </div>
+                <div id="videoInfo" class="p-6">
+                    <!-- 这里将显示视频信息 -->
                 </div>
             </div>
         </div>
@@ -215,7 +207,7 @@
         const loginMessage = document.getElementById('loginMessage');
         const userDisplayName = document.getElementById('userDisplayName');
         const urlInput = document.getElementById('urlInput');
-        const analyzeButton = document.querySelector('button[onclick="analyzeVideo()"]');
+        const analyzeButton = document.querySelector('button[onclick="analyzeVideoDirectly()"]');
 
         if (token && username) {
             loggedOutMenu.style.display = 'none';
@@ -243,29 +235,204 @@
         }
     });
 
-    // 切换下拉菜单显示状态
+    // 切换下拉菜单
     function toggleDropdown(id) {
-        // 关闭其他下拉菜单
-        document.querySelectorAll('.dropdown').forEach(dropdown => {
-            if (dropdown.id !== id) {
-                dropdown.classList.remove('active');
+        var dropdown = document.getElementById(id);
+        if (dropdown.classList.contains('active')) {
+            dropdown.classList.remove('active');
+        } else {
+            // 关闭其他下拉菜单
+            var dropdowns = document.getElementsByClassName('dropdown');
+            for (var i = 0; i < dropdowns.length; i++) {
+                dropdowns[i].classList.remove('active');
             }
-        });
-        
-        // 切换当前下拉菜单
-        const dropdown = document.getElementById(id);
-        dropdown.classList.toggle('active');
+            dropdown.classList.add('active');
+        }
     }
 
     // 点击页面其他地方关闭下拉菜单
-    document.addEventListener('click', (event) => {
-        const dropdowns = document.querySelectorAll('.dropdown');
-        dropdowns.forEach(dropdown => {
-            if (!dropdown.contains(event.target)) {
-                dropdown.classList.remove('active');
+    document.addEventListener('click', function(event) {
+        if (!event.target.closest('.dropdown')) {
+            var dropdowns = document.getElementsByClassName('dropdown');
+            for (var i = 0; i < dropdowns.length; i++) {
+                dropdowns[i].classList.remove('active');
+            }
+        }
+    });
+
+    // 设置功能
+    function openSettings() {
+        alert('设置功能尚未实现');
+    }
+
+    // 退出登录
+    function logoutUser() {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('username');
+        alert('已成功退出登录');
+        window.location.href = 'login.html';
+    }
+
+    // 页面加载时更新用户信息
+    document.addEventListener('DOMContentLoaded', function() {
+        // 获取用户信息
+        var username = localStorage.getItem('username');
+        if (username) {
+            document.getElementById('userDisplayName').textContent = username;
+        }
+    });
+
+    // 直接解析视频
+    async function analyzeVideoDirectly() {
+        // 获取登录状态
+        const token = localStorage.getItem('auth_token');
+        const username = localStorage.getItem('username');
+        
+        if (!token || !username) {
+            alert('请先登录后使用');
+            window.location.href = 'login.html';
+            return;
+        }
+
+        const urlInput = document.getElementById('urlInput');
+        const resultDiv = document.getElementById('result');
+        const videoInfoDiv = document.getElementById('videoInfo');
+        const url = urlInput.value.trim();
+
+        if (!url) {
+            alert('请输入YouTube视频链接');
+            return;
+        }
+
+        try {
+            // 显示加载状态
+            videoInfoDiv.innerHTML = '<div class="text-center py-8"><div class="animate-spin inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full"></div><div class="mt-4 text-gray-600">正在解析视频信息...</div></div>';
+            resultDiv.classList.remove('hidden');
+
+            const response = await fetch('/analyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ url })
+            });
+
+            if (!response.ok) {
+                throw new Error('解析请求失败，状态码: ' + response.status);
+            }
+
+            const data = await response.json();
+            console.log('解析结果:', data);
+            
+            // 格式化数据以适应我们的显示需求
+            window.parsedData = {
+                title: data.title,
+                thumbnail: data.thumbnail,
+                description: data.description || '',
+                formats: {
+                    video: data.formats.filter(f => f.mimeType.includes('video')),
+                    audio: data.formats.filter(f => f.mimeType.includes('audio'))
+                }
+            };
+            
+            // 默认显示视频标签内容
+            showContentTab('video');
+            
+        } catch (error) {
+            console.error('解析错误:', error);
+            videoInfoDiv.innerHTML = `
+                <div class="text-center py-8">
+                    <div class="text-red-600 text-lg">
+                        ${error.message || '视频解析失败，请检查链接是否正确'}
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // 显示不同标签的内容
+    function showContentTab(tab) {
+        const data = window.parsedData;
+        if (!data) {
+            console.error('没有解析数据可显示');
+            return;
+        }
+
+        console.log('显示内容:', tab, data);
+
+        // 更新标签样式
+        document.querySelectorAll('.tab-button').forEach(button => {
+            if (button.dataset.tab === tab) {
+                button.classList.add('tab-active');
+            } else {
+                button.classList.remove('tab-active');
             }
         });
-    });
+
+        const videoInfoDiv = document.getElementById('videoInfo');
+        videoInfoDiv.innerHTML = '';
+
+        switch (tab) {
+            case 'video':
+                // 视频下载选项
+                let videoContent = '';
+                if (data.formats.video && data.formats.video.length > 0) {
+                    videoContent += `<h3 class="text-lg font-semibold mb-4">视频下载选项</h3>`;
+                    data.formats.video.forEach(format => {
+                        const size = format.size ? `${Math.round(format.size / 1024 / 1024)}MB` : '未知大小';
+                        videoContent += `
+                            <div class="mb-2">
+                                <a href="${format.url}" class="text-blue-600 hover:underline" download target="_blank">
+                                    ${format.quality || '视频'} - ${size}
+                                </a>
+                            </div>
+                        `;
+                    });
+                }
+
+                // 音频下载选项
+                if (data.formats.audio && data.formats.audio.length > 0) {
+                    videoContent += '<h3 class="text-lg font-semibold mt-6 mb-4">音频下载选项</h3>';
+                    data.formats.audio.forEach(format => {
+                        const size = format.size ? `${Math.round(format.size / 1024 / 1024)}MB` : '未知大小';
+                        videoContent += `
+                            <div class="mb-2">
+                                <a href="${format.url}" class="text-blue-600 hover:underline" download target="_blank">
+                                    音频 - ${size}
+                                </a>
+                            </div>
+                        `;
+                    });
+                }
+
+                videoInfoDiv.innerHTML = videoContent || '<p class="text-center text-gray-500">没有可用的下载选项</p>';
+                break;
+
+            case 'image':
+                // 显示缩略图
+                if (data.thumbnail) {
+                    videoInfoDiv.innerHTML = `
+                        <div class="text-center">
+                            <img src="${data.thumbnail}" alt="视频缩略图" class="max-w-full h-auto rounded-lg">
+                        </div>
+                    `;
+                } else {
+                    videoInfoDiv.innerHTML = '<p class="text-center text-gray-500">暂无图片</p>';
+                }
+                break;
+
+            case 'text':
+                // 显示标题和描述
+                videoInfoDiv.innerHTML = `
+                    <div class="space-y-4">
+                        <h3 class="text-xl font-semibold">${data.title || '无标题'}</h3>
+                        <p class="whitespace-pre-wrap text-gray-600">${data.description || '暂无描述'}</p>
+                    </div>
+                `;
+                break;
+        }
+    }
     </script>
     <script src="auth.js"></script>
     <script src="app.js"></script>
