@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube视频在线解析下载</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .tab-active {
+            color: #3b82f6;
+            border-bottom: 2px solid #3b82f6;
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            background-color: #f9f9f9;
+            min-width: 120px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            z-index: 1;
+            border-radius: 4px;
+            margin-top: 2px;
+        }
+        .dropdown.active .dropdown-content {
+            display: block;
+        }
+        .dropdown-item {
+            padding: 12px 16px;
+            display: block;
+            color: #333;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .dropdown-item:hover {
+            background-color: #f1f1f1;
+        }
+    </style>
+</head>
+<body class="bg-white text-gray-800 min-h-screen">
+    <!-- 导航栏 -->
+    <nav class="bg-gray-900 text-white py-3 px-6">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-6">
+                <a href="#" class="font-bold text-xl" data-i18n="title">YouTube下载器</a>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="dropdown" id="languageDropdown">
+                    <button class="px-4 py-2 hover:bg-gray-800 rounded" onclick="toggleDropdown('languageDropdown')">Language</button>
+                    <div class="dropdown-content">
+                        <a class="dropdown-item" onclick="changeLanguage('zh-CN')">简体中文</a>
+                        <a class="dropdown-item" onclick="changeLanguage('zh-TW')">繁體中文</a>
+                        <a class="dropdown-item" onclick="changeLanguage('en')">English</a>
+                    </div>
+                </div>
+                <div class="dropdown" id="userDropdown">
+                    <button class="px-4 py-2 hover:bg-gray-800 rounded" onclick="toggleDropdown('userDropdown')" data-i18n="userCenter">
+                        <span id="userDisplayName">个人中心</span>
+                    </button>
+                    <div class="dropdown-content">
+                        <div id="loggedOutMenu">
+                            <a href="login.html" class="dropdown-item" data-i18n="login">登录</a>
+                            <a href="register.html" class="dropdown-item" data-i18n="register">注册</a>
+                        </div>
+                        <div id="loggedInMenu" style="display: none;">
+                            <a href="#" class="dropdown-item" data-i18n="settings">设置</a>
+                            <a href="#" class="dropdown-item" onclick="logout()" data-i18n="logout">退出登录</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto px-4 py-8">
+        <h1 class="text-4xl font-bold text-center mb-8" data-i18n="mainTitle">YouTube视频在线解析下载</h1>
+        
+        <div id="loginMessage" class="max-w-3xl mx-auto mb-8 bg-yellow-100 p-4 rounded-lg text-yellow-800 hidden">
+            请先<a href="login.html" class="text-blue-600 hover:underline">登录</a>后使用下载功能
+        </div>
+
+        <div class="max-w-3xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden border">
+            <div class="p-6">
+                <div class="flex gap-2">
+                    <input 
+                        type="text" 
+                        id="urlInput"
+                        class="flex-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="输入YouTube分享地址"
+                        data-i18n-placeholder="inputPlaceholder"
+                    >
+                    <button 
+                        onclick="analyzeVideo()"
+                        class="px-8 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors text-white"
+                        data-i18n="analyze"
+                    >
+                        解析
+                    </button>
+                </div>
+            </div>
+
+            <div id="result" class="hidden">
+                <div class="border-t border-gray-200">
+                    <div class="flex border-b border-gray-200">
+                        <button class="tab-button px-6 py-3 flex-1 text-center hover:bg-gray-50 transition-colors" data-tab="video" onclick="showContent('video')">视频</button>
+                        <button class="tab-button px-6 py-3 flex-1 text-center hover:bg-gray-50 transition-colors" data-tab="image" onclick="showContent('image')">图片</button>
+                        <button class="tab-button px-6 py-3 flex-1 text-center hover:bg-gray-50 transition-colors" data-tab="text" onclick="showContent('text')">文字</button>
+                    </div>
+                    <div id="videoInfo" class="p-6"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="max-w-3xl mx-auto mt-8 bg-white p-6 rounded-lg shadow-lg border">
+            <h2 class="text-xl font-semibold mb-4" data-i18n="howToTitle">如何解析下载视频？</h2>
+            <ol class="list-decimal list-inside space-y-2 text-gray-600">
+                <li data-i18n="step1">在Youtube里面复制分享链接，例如 https://www.youtube.com/watch?v=UTKS3UKUCUs/</li>
+                <li data-i18n="step2">在本网站输入Youtube分享链接</li>
+                <li data-i18n="step3">点击"解析"按钮获取视频下载链接</li>
+            </ol>
+            <div class="mt-4 p-4 bg-gray-50 rounded-lg text-sm text-gray-600">
+                <p data-i18n="disclaimer">声明：本站为用户提供各大视频地址在线解析服务，我们不储存、不发布视频、视频版权归属其合法持有人所有，本站不提供任何资源存储服务。解析方法来源网络，如有侵权，请联系461545764@qq.com。</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    // 语言配置
+    const i18n = {
+        'zh-CN': {
+            title: 'YouTube下载器',
+            mainTitle: 'YouTube视频在线解析下载',
+            userCenter: '个人中心',
+            login: '登录',
+            register: '注册',
+            settings: '设置',
+            inputPlaceholder: '输入YouTube分享地址',
+            analyze: '解析',
+            howToTitle: '如何解析下载视频？',
+            step1: '在Youtube里面复制分享链接，例如 https://www.youtube.com/watch?v=UTKS3UKUCUs/',
+            step2: '在本网站输入Youtube分享链接',
+            step3: '点击"解析"按钮获取视频下载链接',
+            disclaimer: '声明：本站为用户提供各大视频地址在线解析服务，我们不储存、不发布视频、视频版权归属其合法持有人所有，本站不提供任何资源存储服务。解析方法来源网络，如有侵权，请联系461545764@qq.com。',
+            logout: '退出登录',
+            loginRequired: '请先登录后使用下载功能'
+        },
+        'zh-TW': {
+            title: 'YouTube下載器',
+            mainTitle: 'YouTube視頻在線解析下載',
+            userCenter: '個人中心',
+            login: '登錄',
+            register: '註冊',
+            settings: '設置',
+            inputPlaceholder: '輸入YouTube分享地址',
+            analyze: '解析',
+            howToTitle: '如何解析下載視頻？',
+            step1: '在Youtube裡面復制分享鏈接，例如 https://www.youtube.com/watch?v=UTKS3UKUCUs/',
+            step2: '在本網站輸入Youtube分享鏈接',
+            step3: '點擊"解析"按鈕獲取視頻下載鏈接',
+            disclaimer: '聲明：本站為用戶提供各大視頻地址在線解析服務，我們不儲存、不發布視頻、視頻版權歸屬其合法持有人所有，本站不提供任何資源存儲服務。解析方法來源網絡，如有侵權，請聯繫461545764@qq.com。',
+            logout: '退出登錄',
+            loginRequired: '請先登錄後使用下載功能'
+        },
+        'en': {
+            title: 'YouTube Downloader',
+            mainTitle: 'YouTube Video Online Parser & Downloader',
+            userCenter: 'User Center',
+            login: 'Login',
+            register: 'Register',
+            settings: 'Settings',
+            inputPlaceholder: 'Enter YouTube share link',
+            analyze: 'Parse',
+            howToTitle: 'How to Download Videos?',
+            step1: 'Copy the share link from Youtube, e.g. https://www.youtube.com/watch?v=UTKS3UKUCUs/',
+            step2: 'Enter the Youtube share link on this website',
+            step3: 'Click the "Parse" button to get video download links',
+            disclaimer: 'Disclaimer: This website provides online video parsing services for users. We do not store or publish videos. All video copyrights belong to their legal owners. We do not provide any resource storage services. If there are any copyright issues, please contact 461545764@qq.com.',
+            logout: 'Logout',
+            loginRequired: 'Please login to use the download feature'
+        }
+    };
+
+    // 更改语言函数
+    function changeLanguage(lang) {
+        // 更新页面上所有带有 data-i18n 属性的元素
+        document.querySelectorAll('[data-i18n]').forEach(element => {
+            const key = element.getAttribute('data-i18n');
+            if (i18n[lang][key]) {
+                element.textContent = i18n[lang][key];
+            }
+        });
+
+        // 更新输入框的 placeholder
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(element => {
+            const key = element.getAttribute('data-i18n-placeholder');
+            if (i18n[lang][key]) {
+                element.placeholder = i18n[lang][key];
+            }
+        });
+
+        // 保存语言选择到 localStorage
+        localStorage.setItem('preferred-language', lang);
+    }
+
+    // 检查登录状态并更新UI
+    function updateAuthUI() {
+        const token = localStorage.getItem('auth_token');
+        const username = localStorage.getItem('username');
+        const loggedOutMenu = document.getElementById('loggedOutMenu');
+        const loggedInMenu = document.getElementById('loggedInMenu');
+        const loginMessage = document.getElementById('loginMessage');
+        const userDisplayName = document.getElementById('userDisplayName');
+        const urlInput = document.getElementById('urlInput');
+        const analyzeButton = document.querySelector('button[onclick="analyzeVideo()"]');
+
+        if (token && username) {
+            loggedOutMenu.style.display = 'none';
+            loggedInMenu.style.display = 'block';
+            loginMessage.style.display = 'none';
+            userDisplayName.textContent = username;
+            if (urlInput) urlInput.disabled = false;
+            if (analyzeButton) analyzeButton.disabled = false;
+        } else {
+            loggedOutMenu.style.display = 'block';
+            loggedInMenu.style.display = 'none';
+            loginMessage.style.display = 'block';
+            userDisplayName.textContent = '个人中心';
+            if (urlInput) urlInput.disabled = true;
+            if (analyzeButton) analyzeButton.disabled = true;
+        }
+    }
+
+    // 页面加载时检查登录状态
+    document.addEventListener('DOMContentLoaded', () => {
+        updateAuthUI();
+        const savedLang = localStorage.getItem('preferred-language');
+        if (savedLang) {
+            changeLanguage(savedLang);
+        }
+    });
+
+    // 切换下拉菜单显示状态
+    function toggleDropdown(id) {
+        // 关闭其他下拉菜单
+        document.querySelectorAll('.dropdown').forEach(dropdown => {
+            if (dropdown.id !== id) {
+                dropdown.classList.remove('active');
+            }
+        });
+        
+        // 切换当前下拉菜单
+        const dropdown = document.getElementById(id);
+        dropdown.classList.toggle('active');
+    }
+
+    // 点击页面其他地方关闭下拉菜单
+    document.addEventListener('click', (event) => {
+        const dropdowns = document.querySelectorAll('.dropdown');
+        dropdowns.forEach(dropdown => {
+            if (!dropdown.contains(event.target)) {
+                dropdown.classList.remove('active');
+            }
+        });
+    });
+    </script>
+    <script src="auth.js"></script>
+    <script src="app.js"></script>
+</body>
+</html> 
