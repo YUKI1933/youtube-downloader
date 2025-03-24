@@ -34,6 +34,7 @@ const authMiddleware = (req, res, next) => {
  */
 app.post('/analyze', authMiddleware, async (req, res) => {
     try {
+        console.log('收到解析请求:', req.body);
         const { url } = req.body;
         if (!url) {
             return res.status(400).json({ error: '请提供视频URL' });
@@ -41,7 +42,11 @@ app.post('/analyze', authMiddleware, async (req, res) => {
 
         // 使用内置数据模拟视频信息
         // 在真实环境中，这里应该调用实际的YouTube API或其他服务
-        const videoId = url.includes('v=') ? url.split('v=')[1].split('&')[0] : 'dQw4w9WgXcQ';
+        const videoId = url.includes('v=') ? url.split('v=')[1].split('&')[0] : 
+                       url.includes('shorts/') ? url.split('shorts/')[1].split('?')[0] : 
+                       'dQw4w9WgXcQ';
+        
+        console.log('解析的视频ID:', videoId);
         
         // 获取视频缩略图
         const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
@@ -75,22 +80,13 @@ app.post('/analyze', authMiddleware, async (req, res) => {
         ];
 
         // 尝试获取视频标题
-        let title = 'YouTube 视频';
-        let description = '';
+        let title = 'YouTube 视频 - ' + videoId;
+        let description = '这是一个YouTube视频的描述。由于这是一个演示版本，我们无法获取真实的视频信息。在完整版中，这里会显示真实的视频描述。';
         
         try {
-            // 尝试获取OG标签信息
-            const { data } = await axios.get(url);
-            const titleMatch = data.match(/<title>(.*?)<\/title>/i);
-            const descMatch = data.match(/<meta name="description" content="(.*?)"/i);
-            
-            if (titleMatch && titleMatch[1]) {
-                title = titleMatch[1].replace(' - YouTube', '');
-            }
-            
-            if (descMatch && descMatch[1]) {
-                description = descMatch[1];
-            }
+            // 在生产环境中，这里应该调用YouTube API获取视频信息
+            // 现在我们只是模拟数据
+            console.log('使用模拟数据');
         } catch (error) {
             console.log('无法获取视频元数据', error.message);
         }
@@ -102,10 +98,11 @@ app.post('/analyze', authMiddleware, async (req, res) => {
             formats
         };
 
+        console.log('发送解析结果');
         res.json(response);
     } catch (error) {
         console.error('解析错误:', error);
-        res.status(500).json({ error: '视频解析失败' });
+        res.status(500).json({ error: '视频解析失败: ' + error.message });
     }
 });
 

@@ -6,8 +6,13 @@ window.parsedData = null;
 
 // 解析视频
 async function analyzeVideo() {
-    // 检查用户是否已登录
-    if (!checkAuth()) {
+    // 获取登录状态
+    const token = localStorage.getItem('auth_token');
+    const username = localStorage.getItem('username');
+    
+    if (!token || !username) {
+        alert('请先登录后使用');
+        window.location.href = 'login.html';
         return;
     }
 
@@ -30,16 +35,17 @@ async function analyzeVideo() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({ url })
         });
 
         if (!response.ok) {
-            throw new Error('解析失败');
+            throw new Error('解析请求失败，状态码: ' + response.status);
         }
 
         const data = await response.json();
+        console.log('解析结果:', data);
         
         // 格式化数据以适应我们的显示需求
         window.parsedData = {
@@ -56,6 +62,7 @@ async function analyzeVideo() {
         showContent('video');
         
     } catch (error) {
+        console.error('解析错误:', error);
         videoInfoDiv.innerHTML = `
             <div class="text-center py-8">
                 <div class="text-red-600 text-lg">
@@ -71,13 +78,13 @@ async function analyzeVideo() {
  * @param {string} tab - 标签类型：video/image/text
  */
 function showContent(tab) {
-    // 检查用户是否已登录
-    if (!checkAuth()) {
+    const data = window.parsedData;
+    if (!data) {
+        console.error('没有解析数据可显示');
         return;
     }
 
-    const data = window.parsedData;
-    if (!data) return;
+    console.log('显示内容:', tab, data);
 
     // 更新标签样式
     document.querySelectorAll('.tab-button').forEach(button => {
@@ -95,14 +102,14 @@ function showContent(tab) {
         case 'video':
             // 视频下载选项
             let videoContent = '';
-            if (data.formats.video.length > 0) {
+            if (data.formats.video && data.formats.video.length > 0) {
                 videoContent += `<h3 class="text-lg font-semibold mb-4">视频下载选项</h3>`;
                 data.formats.video.forEach(format => {
                     const size = format.size ? `${Math.round(format.size / 1024 / 1024)}MB` : '未知大小';
                     videoContent += `
                         <div class="mb-2">
-                            <a href="${format.url}" class="text-blue-600 hover:underline" download>
-                                ${format.quality} - ${size}
+                            <a href="${format.url}" class="text-blue-600 hover:underline" download target="_blank">
+                                ${format.quality || '视频'} - ${size}
                             </a>
                         </div>
                     `;
@@ -110,13 +117,13 @@ function showContent(tab) {
             }
 
             // 音频下载选项
-            if (data.formats.audio.length > 0) {
+            if (data.formats.audio && data.formats.audio.length > 0) {
                 videoContent += '<h3 class="text-lg font-semibold mt-6 mb-4">音频下载选项</h3>';
                 data.formats.audio.forEach(format => {
                     const size = format.size ? `${Math.round(format.size / 1024 / 1024)}MB` : '未知大小';
                     videoContent += `
                         <div class="mb-2">
-                            <a href="${format.url}" class="text-blue-600 hover:underline" download>
+                            <a href="${format.url}" class="text-blue-600 hover:underline" download target="_blank">
                                 音频 - ${size}
                             </a>
                         </div>
@@ -124,7 +131,7 @@ function showContent(tab) {
                 });
             }
 
-            videoInfoDiv.innerHTML = videoContent;
+            videoInfoDiv.innerHTML = videoContent || '<p class="text-center text-gray-500">没有可用的下载选项</p>';
             break;
 
         case 'image':
