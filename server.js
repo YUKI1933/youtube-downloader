@@ -109,7 +109,8 @@ app.post('/analyze', authMiddleware, async (req, res) => {
     }
 });
 
-// 根路由
+// 所有页面路由
+// 主页
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -118,10 +119,26 @@ app.get('/', (req, res) => {
 app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'login.html'));
 });
+app.get('/login.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'login.html'));
+});
 
 // 注册页面
 app.get('/register', (req, res) => {
     res.sendFile(path.join(__dirname, 'register.html'));
+});
+app.get('/register.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'register.html'));
+});
+
+// 通用处理 - 捕获所有其他请求
+app.get('*', (req, res) => {
+    // 如果是HTML请求，返回index.html
+    if (req.headers.accept && req.headers.accept.includes('text/html')) {
+        res.sendFile(path.join(__dirname, 'index.html'));
+    } else {
+        res.status(404).send('Not Found');
+    }
 });
 
 // 创建服务器并添加错误处理

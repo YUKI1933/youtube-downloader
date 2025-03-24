@@ -3,7 +3,8 @@ function checkAuth() {
     const token = localStorage.getItem('auth_token');
     const username = localStorage.getItem('username');
     if (!token || !username) {
-        window.location.href = '/login.html';
+        // 使用相对路径
+        window.location.href = 'login.html';
         return false;
     }
     return true;
@@ -25,11 +26,13 @@ if (document.getElementById('loginForm')) {
             if (user) {
                 localStorage.setItem('auth_token', 'dummy_token');
                 localStorage.setItem('username', user.username);
-                window.location.href = '/';
+                window.location.href = 'index.html';
+                alert('登录成功！');
             } else {
                 alert('邮箱或密码错误');
             }
         } catch (error) {
+            console.error('登录错误:', error);
             alert('登录失败，请重试');
         }
     });
@@ -63,8 +66,9 @@ if (document.getElementById('registerForm')) {
             users.push({ username, email, password });
             localStorage.setItem('users', JSON.stringify(users));
             alert('注册成功！');
-            window.location.href = '/login.html';
+            window.location.href = 'login.html';
         } catch (error) {
+            console.error('注册错误:', error);
             alert('注册失败，请重试');
         }
     });
@@ -74,5 +78,5 @@ if (document.getElementById('registerForm')) {
 function logout() {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('username');
-    window.location.href = '/login.html';
+    window.location.href = 'login.html';
 } 

@@ -41,8 +41,58 @@
                     已有账号？ <a href="login.html" class="text-blue-600 hover:underline">立即登录</a>
                 </div>
             </form>
+            <div id="registerStatus" class="mt-4 text-center hidden"></div>
         </div>
     </div>
-    <script src="auth.js"></script>
+
+    <script>
+    // 简单的注册处理逻辑
+    document.getElementById('registerForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const username = document.getElementById('username').value;
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        
+        const statusDiv = document.getElementById('registerStatus');
+        statusDiv.classList.remove('hidden');
+        
+        // 验证密码
+        if (password !== confirmPassword) {
+            statusDiv.textContent = '两次输入的密码不一致';
+            statusDiv.className = 'mt-4 text-center text-red-600';
+            return;
+        }
+        
+        // 从本地存储获取用户
+        let users = [];
+        try {
+            users = JSON.parse(localStorage.getItem('users') || '[]');
+        } catch (error) {
+            console.error('获取用户数据失败', error);
+            users = [];
+        }
+        
+        // 检查邮箱是否已被注册
+        if (users.some(u => u.email === email)) {
+            statusDiv.textContent = '该邮箱已被注册';
+            statusDiv.className = 'mt-4 text-center text-red-600';
+            return;
+        }
+        
+        // 添加新用户
+        users.push({ username, email, password });
+        localStorage.setItem('users', JSON.stringify(users));
+        
+        statusDiv.textContent = '注册成功！正在跳转到登录页面...';
+        statusDiv.className = 'mt-4 text-center text-green-600';
+        
+        // 延迟跳转
+        setTimeout(() => {
+            window.location.href = 'login.html';
+        }, 1500);
+    });
+    </script>
 </body>
 </html> 

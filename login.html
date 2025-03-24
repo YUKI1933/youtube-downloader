@@ -31,8 +31,50 @@
                     还没有账号？ <a href="register.html" class="text-blue-600 hover:underline">立即注册</a>
                 </div>
             </form>
+            <div id="loginStatus" class="mt-4 text-center hidden"></div>
         </div>
     </div>
-    <script src="auth.js"></script>
+
+    <script>
+    // 简单的登录处理逻辑
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        
+        // 从本地存储获取用户
+        let users = [];
+        try {
+            users = JSON.parse(localStorage.getItem('users') || '[]');
+        } catch (error) {
+            console.error('获取用户数据失败', error);
+            users = [];
+        }
+        
+        // 查找匹配用户
+        const user = users.find(u => u.email === email && u.password === password);
+        
+        const statusDiv = document.getElementById('loginStatus');
+        statusDiv.classList.remove('hidden');
+        
+        if (user) {
+            statusDiv.textContent = '登录成功！正在跳转...';
+            statusDiv.className = 'mt-4 text-center text-green-600';
+            
+            // 存储登录状态
+            localStorage.setItem('auth_token', 'dummy_token');
+            localStorage.setItem('username', user.username);
+            
+            // 延迟跳转以显示成功消息
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 1000);
+        } else {
+            statusDiv.textContent = '邮箱或密码错误，请重试';
+            statusDiv.className = 'mt-4 text-center text-red-600';
+        }
+    });
+    </script>
 </body>
 </html> 
