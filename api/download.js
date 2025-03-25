@@ -3,6 +3,31 @@ const youtubedl = require('youtube-dl-exec');
 const path = require('path');
 
 /**
+ * 获取代理配置
+ * @returns {Object|null} 代理配置对象
+ */
+function getProxyConfig() {
+  const proxyUrl = process.env.PROXY_URL;
+  if (!proxyUrl) return null;
+
+  try {
+    const url = new URL(proxyUrl);
+    return {
+      protocol: url.protocol.replace(':', ''),
+      host: url.hostname,
+      port: url.port,
+      auth: url.username && url.password ? {
+        username: url.username,
+        password: url.password
+      } : undefined
+    };
+  } catch (error) {
+    console.error('代理配置解析错误:', error);
+    return null;
+  }
+}
+
+/**
  * 获取视频信息的重试函数
  * @param {Function} fn - 要重试的异步函数
  * @param {number} retries - 重试次数
@@ -29,7 +54,12 @@ async function getVideoInfo(videoId) {
     try {
       const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
       const ytDlpPath = path.join(__dirname, '..', 'bin', 'yt-dlp');
-      const info = await youtubedl(videoUrl, {
+      
+      // 获取代理配置
+      const proxyConfig = getProxyConfig();
+      
+      // 构建yt-dlp选项
+      const options = {
         dumpSingleJson: true,
         noWarnings: true,
         noCallHome: true,
@@ -38,7 +68,21 @@ async function getVideoInfo(videoId) {
         youtubeSkipDashManifest: true,
         format: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         binary: ytDlpPath
+      };
+
+      // 如果存在代理配置,添加到选项中
+      if (proxyConfig) {
+        options.proxy = proxyConfig.protocol + '://' + 
+          (proxyConfig.auth ? `${proxyConfig.auth.username}:${proxyConfig.auth.password}@` : '') +
+          `${proxyConfig.host}:${proxyConfig.port}`;
+      }
+
+      console.log('使用配置:', {
+        ...options,
+        proxy: options.proxy ? '已配置' : '未配置'
       });
+
+      const info = await youtubedl(videoUrl, options);
 
       // 处理格式信息
       const formats = info.formats.map(format => ({
