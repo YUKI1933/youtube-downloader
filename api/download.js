@@ -1,8 +1,11 @@
 // api/download.js
 const ytdl = require('@distube/ytdl-core');
+const path = require('path');
+const os = require('os');
 
-// 设置环境变量禁用调试
-process.env.YTDL_NO_DEBUG = 'true';
+// 修改ytdl-core的内部配置
+const utils = require('@distube/ytdl-core/lib/utils');
+utils.saveDebugFile = () => {}; // 覆盖保存调试文件的函数
 
 /**
  * 代理服务器列表
