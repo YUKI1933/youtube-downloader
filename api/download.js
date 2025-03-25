@@ -1,5 +1,5 @@
 // api/download.js
-const playdl = require('play-dl');
+const youtubedl = require('yt-dlp-exec');
 
 /**
  * 代理服务器列表
@@ -40,62 +40,6 @@ function getProxyConfig() {
 }
 
 /**
- * 初始化play-dl
- */
-async function initializePlayDl() {
-  try {
-    // 设置代理
-    const proxyConfig = getProxyConfig();
-    if (proxyConfig) {
-      process.env.HTTPS_PROXY = proxyConfig;
-      process.env.HTTP_PROXY = proxyConfig;
-      console.log('使用代理:', proxyConfig);
-    }
-
-    // 设置YouTube cookie
-    const cookie = process.env.YOUTUBE_COOKIE;
-    if (cookie) {
-      // 解析cookie字符串
-      const cookies = cookie.split(';').reduce((acc, curr) => {
-        const [name, value] = curr.trim().split('=');
-        if (name && value) {
-          acc[name] = value;
-        }
-        return acc;
-      }, {});
-
-      // 确保必要的cookie存在
-      const requiredCookies = ['SID', 'HSID', 'SSID', 'APISID', 'SAPISID'];
-      const missingCookies = requiredCookies.filter(name => !cookies[name]);
-      
-      if (missingCookies.length > 0) {
-        console.warn('缺少必要的cookie:', missingCookies);
-      }
-
-      await playdl.setToken({
-        youtubeCookies: cookies
-      });
-      console.log('YouTube cookie设置成功');
-    } else {
-      console.log('未设置YouTube cookie，使用匿名访问');
-    }
-
-    // 测试连接
-    try {
-      const testUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
-      const validateResult = await playdl.validate(testUrl);
-      console.log('连接测试结果:', validateResult);
-    } catch (error) {
-      console.error('连接测试失败:', error);
-      throw error;
-    }
-  } catch (error) {
-    console.error('初始化play-dl失败:', error);
-    throw error;
-  }
-}
-
-/**
  * 获取视频信息的重试函数
  * @param {Function} fn - 要重试的异步函数
  * @param {number} retries - 重试次数
@@ -124,47 +68,43 @@ async function getVideoInfo(videoId) {
     try {
       const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
       
-      // 初始化play-dl
-      await initializePlayDl();
-
-      // 验证视频URL
-      const validateResult = await playdl.validate(videoUrl);
-      console.log('URL验证结果:', validateResult);
-      
-      // 支持 youtube 和 yt_video 类型
-      if (validateResult !== 'youtube' && validateResult !== 'yt_video') {
-        throw new Error(`不支持的URL类型: ${validateResult}`);
+      // 获取代理配置
+      const proxyConfig = getProxyConfig();
+      if (proxyConfig) {
+        console.log('使用代理:', proxyConfig);
       }
 
       // 获取视频信息
-      const videoInfo = await playdl.video_info(videoUrl);
+      const info = await youtubedl(videoUrl, {
+        dumpSingleJson: true,
+        noWarnings: true,
+        noCallHome: true,
+        noCheckCertificate: true,
+        preferFreeFormats: true,
+        proxy: proxyConfig || undefined,
+        format: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+      });
       
-      if (!videoInfo) {
+      if (!info) {
         throw new Error('无法获取视频信息');
       }
 
-      const videoDetails = videoInfo.video_details;
-      const formats = videoInfo.format;
-
       // 构建格式数组
-      const processedFormats = formats.map(format => {
-        // 使用视频信息构建下载URL
-        return {
-          itag: format.itag,
-          mimeType: format.mimeType || (format.audioQuality ? 'audio/mp4' : 'video/mp4'),
-          quality: format.qualityLabel || (format.audioQuality || 'Audio'),
-          hasAudio: !!format.audioQuality,
-          hasVideo: !!format.qualityLabel,
-          contentLength: format.contentLength,
-          url: format.url
-        };
-      });
+      const formats = info.formats.map(format => ({
+        itag: format.format_id,
+        mimeType: format.ext === 'm4a' ? 'audio/mp4' : 'video/mp4',
+        quality: format.height ? `${format.height}p` : 'Audio',
+        hasAudio: format.acodec !== 'none',
+        hasVideo: format.vcodec !== 'none',
+        contentLength: format.filesize,
+        url: format.url
+      }));
 
       return {
-        title: videoDetails.title,
-        formats: processedFormats,
-        thumbnail: videoDetails.thumbnails[videoDetails.thumbnails.length - 1].url,
-        description: videoDetails.description || ''
+        title: info.title,
+        formats: formats,
+        thumbnail: info.thumbnail,
+        description: info.description || ''
       };
     } catch (error) {
       console.error('获取视频信息失败:', error);
