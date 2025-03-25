@@ -40,8 +40,7 @@ app.post('/analyze', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '请提供视频URL' });
         }
 
-        // 使用内置数据模拟视频信息
-        // 在真实环境中，这里应该调用实际的YouTube API或其他服务
+        // 从URL中提取视频ID
         const videoId = url.includes('v=') ? url.split('v=')[1].split('&')[0] : 
                        url.includes('shorts/') ? url.split('shorts/')[1].split('?')[0] : 
                        'dQw4w9WgXcQ';
@@ -51,28 +50,32 @@ app.post('/analyze', authMiddleware, async (req, res) => {
         // 获取视频缩略图
         const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
         
-        // 模拟视频格式数据
+        // 为演示目的创建直接下载链接
+        // 注意：在真实环境中，你需要使用实际的视频下载服务或API
+        const videoBaseUrl = `https://example-download-server.com/download/${videoId}`;
+        
+        // 模拟视频格式数据，提供直接下载链接
         const formats = [
             {
-                url: `https://www.youtube.com/watch?v=${videoId}`,
+                url: `${videoBaseUrl}/1080.mp4`,
                 mimeType: 'video/mp4',
                 quality: '1080p',
                 size: 52428800 // 50MB
             },
             {
-                url: `https://www.youtube.com/watch?v=${videoId}`,
+                url: `${videoBaseUrl}/720.mp4`,
                 mimeType: 'video/mp4',
                 quality: '720p',
                 size: 31457280 // 30MB
             },
             {
-                url: `https://www.youtube.com/watch?v=${videoId}`,
+                url: `${videoBaseUrl}/480.mp4`,
                 mimeType: 'video/mp4',
                 quality: '480p',
                 size: 20971520 // 20MB
             },
             {
-                url: `https://www.youtube.com/watch?v=${videoId}`,
+                url: `${videoBaseUrl}/audio.m4a`,
                 mimeType: 'audio/mp4',
                 quality: 'Audio',
                 size: 10485760 // 10MB
@@ -83,13 +86,35 @@ app.post('/analyze', authMiddleware, async (req, res) => {
         let title = 'YouTube 视频 - ' + videoId;
         let description = '这是一个YouTube视频的描述。由于这是一个演示版本，我们无法获取真实的视频信息。在完整版中，这里会显示真实的视频描述。';
         
-        try {
-            // 在生产环境中，这里应该调用YouTube API获取视频信息
-            // 现在我们只是模拟数据
-            console.log('使用模拟数据');
-        } catch (error) {
-            console.log('无法获取视频元数据', error.message);
-        }
+        // 为了演示目的，我们添加一个代理功能，允许通过我们的服务器代理下载
+        app.get('/proxy-download', async (req, res) => {
+            try {
+                const { url, filename } = req.query;
+                if (!url) {
+                    return res.status(400).send('缺少URL参数');
+                }
+                
+                // 设置响应头，强制浏览器下载
+                res.setHeader('Content-Disposition', `attachment; filename="${filename || 'download.mp4'}"`);
+                
+                // 在实际环境中，这里会从原始URL获取视频流并传递给客户端
+                // 这里只是模拟，实际发送一个示例响应
+                res.send('这是模拟的视频内容');
+            } catch (error) {
+                console.error('代理下载错误:', error);
+                res.status(500).send('下载失败: ' + error.message);
+            }
+        });
+        
+        // 更新格式URL以使用我们的代理
+        formats.forEach(format => {
+            // 在真实项目中，你会想要加密或混淆这些URL，并添加身份验证
+            const quality = format.quality.toLowerCase().replace(/[^a-z0-9]/g, '');
+            format.directDownloadUrl = `/proxy-download?url=${encodeURIComponent(format.url)}&filename=${encodeURIComponent(`${videoId}-${quality}.${format.mimeType.includes('audio') ? 'm4a' : 'mp4'}`)}`;
+            // 保留原始URL用于显示信息
+            format.originalUrl = format.url;
+            format.url = format.directDownloadUrl;
+        });
 
         const response = {
             title,
