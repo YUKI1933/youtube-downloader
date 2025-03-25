@@ -53,13 +53,32 @@ function getProxyConfig() {
  * @returns {Promise} 
  */
 async function retry(fn, retries = 3, delay = 1000) {
+  let lastError;
+  
   for (let i = 0; i < retries; i++) {
     try {
+      // 每次重试都使用不同的代理
+      const proxyConfig = getProxyConfig();
+      if (proxyConfig) {
+        console.log(`第 ${i + 1} 次尝试使用代理:`, proxyConfig);
+        process.env.HTTPS_PROXY = proxyConfig;
+        process.env.HTTP_PROXY = proxyConfig;
+      }
+      
       return await fn();
     } catch (error) {
-      if (i === retries - 1) throw error;
-      console.log(`重试 ${i + 1}/${retries}...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      lastError = error;
+      console.error(`第 ${i + 1}/${retries} 次尝试失败:`, error.message);
+      
+      if (i === retries - 1) {
+        console.error('所有重试都失败了');
+        throw lastError;
+      }
+      
+      // 增加重试延迟
+      const nextDelay = delay * (i + 1);
+      console.log(`等待 ${nextDelay}ms 后重试...`);
+      await new Promise(resolve => setTimeout(resolve, nextDelay));
     }
   }
 }
@@ -74,23 +93,39 @@ async function getVideoInfo(videoId) {
     try {
       const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
       
-      // 获取代理配置
-      const proxyConfig = getProxyConfig();
-      if (proxyConfig) {
-        console.log('使用代理:', proxyConfig);
-        process.env.HTTPS_PROXY = proxyConfig;
-        process.env.HTTP_PROXY = proxyConfig;
-      }
+      // 创建多个客户端配置
+      const clients = [
+        {
+          clientName: 'IOS',
+          clientVersion: '18.49.3',
+          deviceModel: 'iPhone14,3',
+          userAgent: 'com.google.ios.youtube/18.49.3 (iPhone14,3; U; CPU iOS 16_0 like Mac OS X)',
+          platform: 'MOBILE'
+        },
+        {
+          clientName: 'ANDROID',
+          clientVersion: '18.11.34',
+          androidSdkVersion: 30,
+          userAgent: 'com.google.android.youtube/18.11.34 (Linux; U; Android 11) gzip',
+          platform: 'MOBILE'
+        },
+        {
+          clientName: 'WEB',
+          clientVersion: '2.20240103.01.00',
+          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          platform: 'DESKTOP'
+        }
+      ];
 
-      // 创建innertube客户端
-      const client = {
-        clientName: 'IOS',
-        clientVersion: '18.49.3',
-        deviceModel: 'iPhone14,3',
-        userAgent: 'com.google.ios.youtube/18.49.3 (iPhone14,3; U; CPU iOS 16_0 like Mac OS X)',
+      // 随机选择一个客户端配置
+      const client = clients[Math.floor(Math.random() * clients.length)];
+      console.log('使用客户端配置:', client.clientName);
+
+      // 扩展客户端配置
+      const extendedClient = {
+        ...client,
         hl: 'zh-CN',
         gl: 'US',
-        platform: 'MOBILE',
         utcOffsetMinutes: -new Date().getTimezoneOffset(),
         visitorData: process.env.VISITOR_DATA || undefined
       };
@@ -101,16 +136,16 @@ async function getVideoInfo(videoId) {
           headers: {
             'User-Agent': client.userAgent,
             'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-            'x-youtube-client-name': '5',
+            'x-youtube-client-name': client.clientName === 'IOS' ? '5' : (client.clientName === 'ANDROID' ? '3' : '1'),
             'x-youtube-client-version': client.clientVersion,
-            'x-youtube-device': client.deviceModel,
+            ...(client.deviceModel && {'x-youtube-device': client.deviceModel}),
             'x-youtube-page-cl': 'null',
-            'x-youtube-page-label': 'youtube.mobile.main',
-            'x-youtube-utc-offset': client.utcOffsetMinutes.toString(),
+            'x-youtube-page-label': client.platform === 'MOBILE' ? 'youtube.mobile.main' : 'youtube.web',
+            'x-youtube-utc-offset': extendedClient.utcOffsetMinutes.toString(),
             'x-youtube-variants-checksum': 'null'
           }
         },
-        client
+        client: extendedClient
       });
       
       if (!info) {
