@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "build": "echo 'Build completed'",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "postinstall": "node scripts/download-yt-dlp.js"
   },
   "keywords": [],
   "author": "",
