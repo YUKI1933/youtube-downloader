@@ -10,8 +10,12 @@ async function getVideoInfo(videoId) {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.5',
-        }
-      }
+          'Cookie': 'CONSENT=YES+cb; YSC=DwKYllHNwmw; VISITOR_INFO1_LIVE=5VKEkHk2oqk;'
+        },
+        rejectUnauthorized: false
+      },
+      lang: 'en',
+      clientVersion: '17.33.2'
     });
     return {
       title: info.videoDetails.title,
@@ -157,8 +161,12 @@ module.exports = async (req, res) => {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
               'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
               'Accept-Language': 'en-US,en;q=0.5',
-            }
-          }
+              'Cookie': 'CONSENT=YES+cb; YSC=DwKYllHNwmw; VISITOR_INFO1_LIVE=5VKEkHk2oqk;'
+            },
+            rejectUnauthorized: false
+          },
+          lang: 'en',
+          clientVersion: '17.33.2'
         });
         const format = info.formats.find(f => f.itag.toString() === itag.toString());
         
