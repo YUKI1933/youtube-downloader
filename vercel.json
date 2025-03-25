@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "buildCommand": "npm install -g yt-dlp",
   "builds": [
     {
       "src": "server.js",

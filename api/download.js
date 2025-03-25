@@ -1,28 +1,31 @@
 // api/download.js
-const { exec } = require('child_process');
-const util = require('util');
-const execAsync = util.promisify(exec);
+const ytdl = require('ytdl-core');
 
 // 获取视频信息
 async function getVideoInfo(videoId) {
   try {
-    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const { stdout } = await execAsync(`yt-dlp -j "${videoUrl}" --no-warnings --no-check-certificates`);
-    const info = JSON.parse(stdout);
-
+    const info = await ytdl.getInfo(videoId, {
+      requestOptions: {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+        }
+      }
+    });
     return {
-      title: info.title,
+      title: info.videoDetails.title,
       formats: info.formats.map(format => ({
-        itag: format.format_id,
-        mimeType: format.ext,
-        quality: format.resolution || format.format_note,
-        hasAudio: format.acodec !== 'none',
-        hasVideo: format.vcodec !== 'none',
-        contentLength: format.filesize,
+        itag: format.itag,
+        mimeType: format.mimeType,
+        quality: format.qualityLabel || format.quality,
+        hasAudio: format.hasAudio,
+        hasVideo: format.hasVideo,
+        contentLength: format.contentLength,
         url: format.url
       })),
-      thumbnail: info.thumbnail,
-      description: info.description
+      thumbnail: info.videoDetails.thumbnails[info.videoDetails.thumbnails.length - 1].url,
+      description: info.videoDetails.description
     };
   } catch (error) {
     console.error('Error getting video info:', error);
@@ -34,18 +37,17 @@ async function getVideoInfo(videoId) {
 function processFormats(formats) {
   // 仅保留MP4视频和M4A音频
   const filteredFormats = formats.filter(format => {
-    return format.url && (format.mimeType === 'mp4' || format.mimeType === 'm4a');
+    const mimeType = format.mimeType || '';
+    return (mimeType.includes('mp4') || mimeType.includes('m4a')) && format.url;
   });
 
   // 分类格式
   const videoFormats = filteredFormats
     .filter(format => format.hasVideo)
     .sort((a, b) => {
-      const getQualityNumber = (quality) => {
-        const match = quality?.match(/\d+/);
-        return match ? parseInt(match[0]) : 0;
-      };
-      return getQualityNumber(b.quality) - getQualityNumber(a.quality);
+      const qualityA = parseInt(a.quality?.match(/\d+/)?.[0] || 0);
+      const qualityB = parseInt(b.quality?.match(/\d+/)?.[0] || 0);
+      return qualityB - qualityA;
     });
 
   const audioFormats = filteredFormats
@@ -150,7 +152,7 @@ module.exports = async (req, res) => {
         }
 
         const info = await getVideoInfo(videoId);
-        const format = info.formats.find(f => f.itag === itag);
+        const format = info.formats.find(f => f.itag.toString() === itag.toString());
         
         if (!format) {
           return res.status(404).json({ error: '找不到指定的格式' });
