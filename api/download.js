@@ -3,28 +3,70 @@ const youtubedl = require('youtube-dl-exec');
 const path = require('path');
 
 /**
+ * 代理服务器列表
+ * @type {Array<{protocol: string, host: string, port: string}>}
+ */
+const PROXY_SERVERS = [
+  {
+    protocol: 'http',
+    host: '51.159.115.233',
+    port: '3128'
+  },
+  {
+    protocol: 'http',
+    host: '165.225.208.243',
+    port: '10605'
+  },
+  {
+    protocol: 'http',
+    host: '165.225.208.77',
+    port: '10605'
+  },
+  {
+    protocol: 'http',
+    host: '165.225.208.84',
+    port: '10605'
+  }
+];
+
+let currentProxyIndex = 0;
+
+/**
+ * 获取下一个代理服务器
+ * @returns {Object} 代理配置对象
+ */
+function getNextProxy() {
+  const proxy = PROXY_SERVERS[currentProxyIndex];
+  currentProxyIndex = (currentProxyIndex + 1) % PROXY_SERVERS.length;
+  return proxy;
+}
+
+/**
  * 获取代理配置
  * @returns {Object|null} 代理配置对象
  */
 function getProxyConfig() {
+  // 优先使用环境变量中的代理配置
   const proxyUrl = process.env.PROXY_URL;
-  if (!proxyUrl) return null;
-
-  try {
-    const url = new URL(proxyUrl);
-    return {
-      protocol: url.protocol.replace(':', ''),
-      host: url.hostname,
-      port: url.port,
-      auth: url.username && url.password ? {
-        username: url.username,
-        password: url.password
-      } : undefined
-    };
-  } catch (error) {
-    console.error('代理配置解析错误:', error);
-    return null;
+  if (proxyUrl) {
+    try {
+      const url = new URL(proxyUrl);
+      return {
+        protocol: url.protocol.replace(':', ''),
+        host: url.hostname,
+        port: url.port,
+        auth: url.username && url.password ? {
+          username: url.username,
+          password: url.password
+        } : undefined
+      };
+    } catch (error) {
+      console.error('代理配置解析错误:', error);
+    }
   }
+
+  // 如果没有环境变量配置,使用代理服务器列表
+  return getNextProxy();
 }
 
 /**
