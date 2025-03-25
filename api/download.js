@@ -82,7 +82,10 @@ async function getVideoInfo(videoId) {
 
       // 验证视频URL
       const validateResult = await playdl.validate(videoUrl);
-      if (validateResult !== 'youtube') {
+      console.log('URL验证结果:', validateResult);
+      
+      // 支持 youtube 和 yt_video 类型
+      if (validateResult !== 'youtube' && validateResult !== 'yt_video') {
         throw new Error(`不支持的URL类型: ${validateResult}`);
       }
 
