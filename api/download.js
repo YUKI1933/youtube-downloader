@@ -1,5 +1,6 @@
 // api/download.js
 const ytdlp = require('yt-dlp-exec');
+const path = require('path');
 
 // 获取视频信息
 async function getVideoInfo(videoId) {
@@ -12,7 +13,8 @@ async function getVideoInfo(videoId) {
       noCheckCertificates: true,
       addHeader: [
         'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-      ]
+      ],
+      binaryPath: path.join(process.cwd(), 'yt-dlp')
     });
 
     return {
