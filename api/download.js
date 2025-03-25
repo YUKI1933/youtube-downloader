@@ -8,8 +8,19 @@ async function getVideoInfo(videoId) {
       requestOptions: {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+          'Accept-Language': 'en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+          'Cookie': 'CONSENT=YES+cb; YSC=DwKYllHNwmw; VISITOR_INFO1_LIVE=5VKEkHk2oqk; PREF=tz=Asia.Shanghai; LOGIN_INFO=AFmmF2swRQIhALG4F5j5tKQ5z5q5j5q5j5q5j5q5j5q5j5q5j5q5j5q5IQDGvKjN8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8A:QUQ3MjNmeXRLUWRqWDhMZDJic0FxbXBJdF9MemJZT2FLNkdZOVBLUkd3TmJONkpBWEFYZGRBWjNCN1JDRXVhQUxGbk1MMWNYUmRHdw==',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+          'Upgrade-Insecure-Requests': '1',
+          'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+          'sec-ch-ua-mobile': '?0',
+          'sec-ch-ua-platform': '"Windows"'
         }
       }
     });
