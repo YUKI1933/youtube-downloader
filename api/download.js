@@ -6,11 +6,6 @@ async function getVideoInfo(videoId) {
   try {
     const info = await ytdl.getInfo(videoId, {
       requestOptions: {
-        transform: (parsed) => {
-          // 添加额外的查询参数
-          parsed.searchParams.set('has_verified', '1');
-          return parsed;
-        },
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36',
           'accept': '*/*',
@@ -18,14 +13,26 @@ async function getVideoInfo(videoId) {
           'accept-language': 'en-US,en;q=0.9',
           'cache-control': 'no-cache',
           'pragma': 'no-cache',
-          'referer': 'https://www.youtube.com/',
+          'referer': 'https://www.youtube.com/watch?v=' + videoId,
           'origin': 'https://www.youtube.com'
         }
       }
     });
+
+    // 处理格式信息
+    const formats = info.formats.map(format => {
+      // 为URL添加额外参数
+      if (format.url) {
+        const url = new URL(format.url);
+        url.searchParams.set('has_verified', '1');
+        format.url = url.toString();
+      }
+      return format;
+    });
+
     return {
       title: info.videoDetails.title,
-      formats: info.formats.map(format => ({
+      formats: formats.map(format => ({
         itag: format.itag,
         mimeType: format.mimeType,
         quality: format.qualityLabel || format.quality,
