@@ -75,7 +75,9 @@ async function getVideoInfo(videoId) {
 
       // 配置代理
       if (proxyConfig) {
-        playdl.setProxy(proxyConfig);
+        // 设置全局代理
+        process.env.HTTPS_PROXY = proxyConfig;
+        process.env.HTTP_PROXY = proxyConfig;
       }
 
       // 验证视频URL
