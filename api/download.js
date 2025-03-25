@@ -1,35 +1,33 @@
 // api/download.js
-const ytdl = require('ytdl-core');
+const ytdlp = require('yt-dlp-exec');
 
 // 获取视频信息
 async function getVideoInfo(videoId) {
   try {
-    const info = await ytdl.getInfo(videoId, {
-      requestOptions: {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-          'Cookie': 'CONSENT=YES+cb; YSC=DwKYllHNwmw; VISITOR_INFO1_LIVE=5VKEkHk2oqk;'
-        },
-        rejectUnauthorized: false
-      },
-      lang: 'en',
-      clientVersion: '17.33.2'
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const info = await ytdlp(videoUrl, {
+      dumpSingleJson: true,
+      noWarnings: true,
+      preferFreeFormats: true,
+      noCheckCertificates: true,
+      addHeader: [
+        'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+      ]
     });
+
     return {
-      title: info.videoDetails.title,
+      title: info.title,
       formats: info.formats.map(format => ({
-        itag: format.itag,
-        mimeType: format.mimeType,
-        quality: format.qualityLabel || format.quality,
-        hasAudio: format.hasAudio,
-        hasVideo: format.hasVideo,
-        contentLength: format.contentLength,
+        itag: format.format_id,
+        mimeType: format.ext,
+        quality: format.resolution || format.format_note,
+        hasAudio: format.acodec !== 'none',
+        hasVideo: format.vcodec !== 'none',
+        contentLength: format.filesize,
         url: format.url
       })),
-      thumbnail: info.videoDetails.thumbnails[info.videoDetails.thumbnails.length - 1].url,
-      description: info.videoDetails.description
+      thumbnail: info.thumbnail,
+      description: info.description
     };
   } catch (error) {
     console.error('Error getting video info:', error);
@@ -41,17 +39,18 @@ async function getVideoInfo(videoId) {
 function processFormats(formats) {
   // 仅保留MP4视频和M4A音频
   const filteredFormats = formats.filter(format => {
-    const mimeType = format.mimeType || '';
-    return (mimeType.includes('mp4') || mimeType.includes('m4a')) && format.url;
+    return format.url && (format.mimeType === 'mp4' || format.mimeType === 'm4a');
   });
 
   // 分类格式
   const videoFormats = filteredFormats
     .filter(format => format.hasVideo)
     .sort((a, b) => {
-      const qualityA = parseInt(a.quality?.match(/\d+/)?.[0] || 0);
-      const qualityB = parseInt(b.quality?.match(/\d+/)?.[0] || 0);
-      return qualityB - qualityA;
+      const getQualityNumber = (quality) => {
+        const match = quality?.match(/\d+/);
+        return match ? parseInt(match[0]) : 0;
+      };
+      return getQualityNumber(b.quality) - getQualityNumber(a.quality);
     });
 
   const audioFormats = filteredFormats
@@ -155,20 +154,8 @@ module.exports = async (req, res) => {
           return res.status(400).json({ error: '请提供itag参数' });
         }
 
-        const info = await ytdl.getInfo(videoId, {
-          requestOptions: {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.5',
-              'Cookie': 'CONSENT=YES+cb; YSC=DwKYllHNwmw; VISITOR_INFO1_LIVE=5VKEkHk2oqk;'
-            },
-            rejectUnauthorized: false
-          },
-          lang: 'en',
-          clientVersion: '17.33.2'
-        });
-        const format = info.formats.find(f => f.itag.toString() === itag.toString());
+        const info = await getVideoInfo(videoId);
+        const format = info.formats.find(f => f.itag === itag);
         
         if (!format) {
           return res.status(404).json({ error: '找不到指定的格式' });
