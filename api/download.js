@@ -1,5 +1,5 @@
 // api/download.js
-const ytdlp = require('yt-dlp');
+const youtubedl = require('youtube-dl-exec');
 
 /**
  * 获取视频信息的重试函数
@@ -27,14 +27,15 @@ async function getVideoInfo(videoId) {
   return retry(async () => {
     try {
       const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-      const info = await ytdlp.getInfo(videoUrl, {
+      const info = await youtubedl(videoUrl, {
         dumpSingleJson: true,
         noWarnings: true,
         noCallHome: true,
         noCheckCertificate: true,
         preferFreeFormats: true,
         youtubeSkipDashManifest: true,
-        format: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+        format: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        binary: 'yt-dlp'
       });
 
       // 处理格式信息
