@@ -49,7 +49,21 @@ async function initializePlayDl() {
     if (proxyConfig) {
       process.env.HTTPS_PROXY = proxyConfig;
       process.env.HTTP_PROXY = proxyConfig;
+      console.log('使用代理:', proxyConfig);
     }
+
+    // 设置自定义请求头
+    playdl.setOptions({
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'max-age=0'
+      }
+    });
 
     // 设置YouTube cookie
     const cookie = process.env.YOUTUBE_COOKIE;
@@ -63,6 +77,14 @@ async function initializePlayDl() {
         return acc;
       }, {});
 
+      // 确保必要的cookie存在
+      const requiredCookies = ['SID', 'HSID', 'SSID', 'APISID', 'SAPISID'];
+      const missingCookies = requiredCookies.filter(name => !cookies[name]);
+      
+      if (missingCookies.length > 0) {
+        console.warn('缺少必要的cookie:', missingCookies);
+      }
+
       await playdl.setToken({
         youtubeCookies: cookies
       });
@@ -70,9 +92,19 @@ async function initializePlayDl() {
     } else {
       console.log('未设置YouTube cookie，使用匿名访问');
     }
+
+    // 测试连接
+    try {
+      const testUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+      const validateResult = await playdl.validate(testUrl);
+      console.log('连接测试结果:', validateResult);
+    } catch (error) {
+      console.error('连接测试失败:', error);
+      throw error;
+    }
   } catch (error) {
     console.error('初始化play-dl失败:', error);
-    throw error; // 抛出错误以便上层捕获
+    throw error;
   }
 }
 
@@ -84,13 +116,14 @@ async function initializePlayDl() {
  * @returns {Promise} 
  */
 async function retry(fn, retries = 3, delay = 1000) {
-  try {
-    return await fn();
-  } catch (error) {
-    if (retries <= 0) throw error;
-    console.log(`重试请求，剩余重试次数: ${retries-1}`);
-    await new Promise(resolve => setTimeout(resolve, delay));
-    return retry(fn, retries - 1, delay * 2);
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      console.log(`重试 ${i + 1}/${retries}...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
   }
 }
 
