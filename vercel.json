@@ -1,12 +1,10 @@
 {
   "version": 2,
+  "buildCommand": "npm install -g yt-dlp",
   "builds": [
     {
       "src": "server.js",
-      "use": "@vercel/node",
-      "config": {
-        "installCommand": "curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o yt-dlp && chmod +x yt-dlp"
-      }
+      "use": "@vercel/node"
     },
     {
       "src": "api/**/*.js",

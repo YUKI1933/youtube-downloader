@@ -1,21 +1,14 @@
 // api/download.js
-const ytdlp = require('yt-dlp-exec');
-const path = require('path');
+const { exec } = require('child_process');
+const util = require('util');
+const execAsync = util.promisify(exec);
 
 // 获取视频信息
 async function getVideoInfo(videoId) {
   try {
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const info = await ytdlp(videoUrl, {
-      dumpSingleJson: true,
-      noWarnings: true,
-      preferFreeFormats: true,
-      noCheckCertificates: true,
-      addHeader: [
-        'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-      ],
-      binaryPath: path.join(process.cwd(), 'yt-dlp')
-    });
+    const { stdout } = await execAsync(`yt-dlp -j "${videoUrl}" --no-warnings --no-check-certificates`);
+    const info = JSON.parse(stdout);
 
     return {
       title: info.title,
