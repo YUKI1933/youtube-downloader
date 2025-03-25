@@ -1,6 +1,9 @@
 // api/download.js
 const ytdl = require('@distube/ytdl-core');
 
+// 禁用调试文件写入
+ytdl.setWriteDebugFile(false);
+
 /**
  * 代理服务器列表
  * @type {Array<string>}
