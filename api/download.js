@@ -1,6 +1,16 @@
 // api/download.js
 const youtubedl = require('youtube-dl-exec');
 const path = require('path');
+const fs = require('fs');
+
+/**
+ * 检查yt-dlp二进制文件是否存在
+ * @returns {boolean} 是否存在
+ */
+function checkYtDlpBinary() {
+  const ytDlpPath = path.join(__dirname, '..', 'bin', 'yt-dlp');
+  return fs.existsSync(ytDlpPath);
+}
 
 /**
  * 代理服务器列表
@@ -94,6 +104,11 @@ async function retry(fn, retries = 3, delay = 1000) {
 async function getVideoInfo(videoId) {
   return retry(async () => {
     try {
+      // 检查yt-dlp二进制文件
+      if (!checkYtDlpBinary()) {
+        throw new Error('yt-dlp二进制文件不存在，请确保postinstall脚本已运行');
+      }
+
       const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
       const ytDlpPath = path.join(__dirname, '..', 'bin', 'yt-dlp');
       
@@ -109,7 +124,19 @@ async function getVideoInfo(videoId) {
         preferFreeFormats: true,
         youtubeSkipDashManifest: true,
         format: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-        binary: ytDlpPath
+        binary: ytDlpPath,
+        extractorRetries: 3,
+        socketTimeout: 30000,
+        retries: 3,
+        fragmentRetries: 3,
+        fileAccessRetries: 3,
+        retrySleep: 5,
+        fragmentRetrySleep: 5,
+        maxSleepInterval: 5,
+        sleepInterval: 5,
+        maxSleepIntervalCap: 5,
+        sleepIntervalCap: 5,
+        sleepIntervalRequests: 3
       };
 
       // 如果存在代理配置,添加到选项中
@@ -121,10 +148,15 @@ async function getVideoInfo(videoId) {
 
       console.log('使用配置:', {
         ...options,
-        proxy: options.proxy ? '已配置' : '未配置'
+        proxy: options.proxy ? '已配置' : '未配置',
+        binary: ytDlpPath
       });
 
       const info = await youtubedl(videoUrl, options);
+
+      if (!info || !info.formats) {
+        throw new Error('无法获取视频信息');
+      }
 
       // 处理格式信息
       const formats = info.formats.map(format => ({
@@ -144,7 +176,7 @@ async function getVideoInfo(videoId) {
         description: info.description
       };
     } catch (error) {
-      console.error('Error getting video info:', error);
+      console.error('获取视频信息失败:', error);
       throw error;
     }
   });
