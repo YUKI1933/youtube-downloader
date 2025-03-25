@@ -6,16 +6,22 @@ async function getVideoInfo(videoId) {
   try {
     const info = await ytdl.getInfo(videoId, {
       requestOptions: {
+        transform: (parsed) => {
+          // 添加额外的查询参数
+          parsed.searchParams.set('has_verified', '1');
+          return parsed;
+        },
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
-          'sec-ch-ua-mobile': '?0',
-          'sec-ch-ua-platform': '"Windows"'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36',
+          'accept': '*/*',
+          'accept-encoding': 'gzip, deflate',
+          'accept-language': 'en-US,en;q=0.9',
+          'cache-control': 'no-cache',
+          'pragma': 'no-cache',
+          'referer': 'https://www.youtube.com/',
+          'origin': 'https://www.youtube.com'
         }
-      },
-      lang: 'en'
+      }
     });
     return {
       title: info.videoDetails.title,
