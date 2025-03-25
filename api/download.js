@@ -56,6 +56,10 @@ function processFormats(formats) {
 }
 
 module.exports = async (req, res) => {
+  console.log('收到API请求:', req.url);
+  console.log('请求方法:', req.method);
+  console.log('请求参数:', req.query);
+
   // 允许所有跨域请求
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -68,8 +72,11 @@ module.exports = async (req, res) => {
 
   try {
     const { url, action } = req.query;
+    console.log('处理URL:', url);
+    console.log('操作类型:', action);
     
     if (!url) {
+      console.log('错误: 未提供URL');
       return res.status(400).json({ error: '请提供视频URL参数' });
     }
 
@@ -82,13 +89,20 @@ module.exports = async (req, res) => {
     } else if (url.includes('youtube.com/shorts/')) {
       videoId = url.split('shorts/')[1].split('?')[0];
     } else {
+      console.log('错误: 不支持的URL格式');
       return res.status(400).json({ error: '不支持的URL格式' });
     }
 
+    console.log('提取的视频ID:', videoId);
+
     // 如果是分析请求
     if (action === 'analyze') {
+      console.log('开始获取视频信息...');
       const info = await getVideoInfo(videoId);
+      console.log('成功获取视频信息');
       const { videoFormats, audioFormats } = processFormats(info.formats);
+      console.log('视频格式数量:', videoFormats.length);
+      console.log('音频格式数量:', audioFormats.length);
       
       return res.status(200).json({
         title: info.title,
