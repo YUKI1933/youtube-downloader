@@ -1,5 +1,5 @@
 // api/download.js
-const youtubedl = require('yt-dlp-exec');
+const ytdl = require('@distube/ytdl-core');
 
 /**
  * 代理服务器列表
@@ -72,17 +72,20 @@ async function getVideoInfo(videoId) {
       const proxyConfig = getProxyConfig();
       if (proxyConfig) {
         console.log('使用代理:', proxyConfig);
+        process.env.HTTPS_PROXY = proxyConfig;
+        process.env.HTTP_PROXY = proxyConfig;
       }
 
       // 获取视频信息
-      const info = await youtubedl(videoUrl, {
-        dumpSingleJson: true,
-        noWarnings: true,
-        noCallHome: true,
-        noCheckCertificate: true,
-        preferFreeFormats: true,
-        proxy: proxyConfig || undefined,
-        format: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+      const info = await ytdl.getInfo(videoUrl, {
+        lang: 'zh-CN',
+        requestOptions: {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Cookie': process.env.YOUTUBE_COOKIE || ''
+          }
+        }
       });
       
       if (!info) {
@@ -91,20 +94,20 @@ async function getVideoInfo(videoId) {
 
       // 构建格式数组
       const formats = info.formats.map(format => ({
-        itag: format.format_id,
-        mimeType: format.ext === 'm4a' ? 'audio/mp4' : 'video/mp4',
-        quality: format.height ? `${format.height}p` : 'Audio',
-        hasAudio: format.acodec !== 'none',
-        hasVideo: format.vcodec !== 'none',
-        contentLength: format.filesize,
+        itag: format.itag,
+        mimeType: format.mimeType || 'video/mp4',
+        quality: format.qualityLabel || 'Audio',
+        hasAudio: format.hasAudio,
+        hasVideo: format.hasVideo,
+        contentLength: format.contentLength,
         url: format.url
       }));
 
       return {
-        title: info.title,
+        title: info.videoDetails.title,
         formats: formats,
-        thumbnail: info.thumbnail,
-        description: info.description || ''
+        thumbnail: info.videoDetails.thumbnails[info.videoDetails.thumbnails.length - 1].url,
+        description: info.videoDetails.description || ''
       };
     } catch (error) {
       console.error('获取视频信息失败:', error);
