@@ -1,50 +1,7 @@
 // api/download.js
 const express = require('express');
-const playdl = require('play-dl');
-const path = require('path');
-const os = require('os');
-
-// 修改ytdl-core的内部配置
-const utils = require('@distube/ytdl-core/lib/utils');
-utils.saveDebugFile = () => {}; // 覆盖保存调试文件的函数
-
-/**
- * 代理服务器列表
- * @type {Array<string>}
- */
-const PROXY_SERVERS = [
-  'http://51.159.115.233:3128',
-  'http://165.225.208.243:10605',
-  'http://165.225.208.77:10605',
-  'http://165.225.208.84:10605'
-];
-
-let currentProxyIndex = 0;
-
-/**
- * 获取下一个代理服务器
- * @returns {string} 代理服务器URL
- */
-function getNextProxy() {
-  const proxy = PROXY_SERVERS[currentProxyIndex];
-  currentProxyIndex = (currentProxyIndex + 1) % PROXY_SERVERS.length;
-  return proxy;
-}
-
-/**
- * 获取代理配置
- * @returns {string|null} 代理服务器URL
- */
-function getProxyConfig() {
-  // 优先使用环境变量中的代理配置
-  const proxyUrl = process.env.PROXY_URL;
-  if (proxyUrl) {
-    return proxyUrl;
-  }
-
-  // 如果没有环境变量配置,使用代理服务器列表
-  return getNextProxy();
-}
+const chromium = require('chrome-aws-lambda');
+const puppeteer = require('puppeteer-core');
 
 /**
  * 获取视频信息的重试函数
@@ -68,7 +25,6 @@ async function retry(fn, retries = 3, delay = 1000) {
         throw lastError;
       }
       
-      // 增加重试延迟
       const nextDelay = delay * (i + 1);
       console.log(`等待 ${nextDelay}ms 后重试...`);
       await new Promise(resolve => setTimeout(resolve, nextDelay));
@@ -82,77 +38,84 @@ async function retry(fn, retries = 3, delay = 1000) {
  * @returns {Promise<Object>} 视频信息
  */
 async function getVideoInfo(videoId) {
-  return retry(async () => {
-    try {
-      const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-      
-      // 验证URL
-      const validateResult = await playdl.validate(videoUrl);
-      console.log('URL验证结果:', validateResult);
-      if (validateResult !== 'youtube' && validateResult !== 'yt_video') {
-        throw new Error(`不支持的URL类型: ${validateResult}`);
-      }
+  let browser = null;
+  
+  try {
+    // 启动浏览器
+    browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath,
+      headless: true,
+      ignoreHTTPSErrors: true
+    });
 
-      // 获取视频信息
-      const info = await playdl.video_info(videoUrl);
-      if (!info) {
+    // 创建新页面
+    const page = await browser.newPage();
+    
+    // 设置用户代理
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    
+    // 设置请求拦截
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      // 只允许文档和XHR请求
+      if (['document', 'xhr'].includes(request.resourceType())) {
+        request.continue();
+      } else {
+        request.abort();
+      }
+    });
+
+    // 导航到视频页面
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    await page.goto(videoUrl, { waitUntil: 'networkidle0' });
+
+    // 等待视频信息加载
+    await page.waitForSelector('ytd-watch-metadata');
+
+    // 提取视频信息
+    const videoInfo = await page.evaluate(() => {
+      const ytInitialPlayerResponse = window.ytInitialPlayerResponse;
+      if (!ytInitialPlayerResponse) {
         throw new Error('无法获取视频信息');
       }
 
-      // 处理视频格式
-      const formats = info.format;
-      const videoFormats = formats.filter(format => format.mimeType.includes('video'));
+      const { videoDetails, streamingData } = ytInitialPlayerResponse;
       
-      // 按质量排序
-      const sortedFormats = videoFormats.sort((a, b) => {
-        const qualityA = parseInt(a.quality?.match(/\d+/)?.[0] || '0');
-        const qualityB = parseInt(b.quality?.match(/\d+/)?.[0] || '0');
-        return qualityB - qualityA;
-      });
+      // 处理格式
+      const formats = [];
+      if (streamingData.formats) {
+        formats.push(...streamingData.formats);
+      }
+      if (streamingData.adaptiveFormats) {
+        formats.push(...streamingData.adaptiveFormats);
+      }
 
       return {
-        title: info.video_details.title,
-        description: info.video_details.description,
-        duration: info.video_details.durationInSec,
-        thumbnail: info.video_details.thumbnails[0].url,
-        formats: sortedFormats.map(format => ({
+        title: videoDetails.title,
+        description: videoDetails.shortDescription,
+        duration: parseInt(videoDetails.lengthSeconds),
+        thumbnail: videoDetails.thumbnail.thumbnails.pop().url,
+        formats: formats.map(format => ({
           url: format.url,
           mimeType: format.mimeType,
-          quality: format.quality,
+          quality: format.qualityLabel || format.quality,
           container: format.container,
           size: format.contentLength
         }))
       };
-    } catch (error) {
-      console.error('获取视频信息失败:', error);
-      throw error;
+    });
+
+    return videoInfo;
+  } catch (error) {
+    console.error('获取视频信息失败:', error);
+    throw error;
+  } finally {
+    if (browser) {
+      await browser.close();
     }
-  });
-}
-
-// 过滤并分类格式
-function processFormats(formats) {
-  // 仅保留有效URL的格式
-  const filteredFormats = formats.filter(format => format.url);
-
-  // 分类格式
-  const videoFormats = filteredFormats
-    .filter(format => format.hasVideo)
-    .sort((a, b) => {
-      const qualityA = parseInt(a.quality?.match(/\d+/)?.[0] || 0);
-      const qualityB = parseInt(b.quality?.match(/\d+/)?.[0] || 0);
-      return qualityB - qualityA;
-    });
-
-  const audioFormats = filteredFormats
-    .filter(format => format.hasAudio && !format.hasVideo)
-    .sort((a, b) => {
-      const sizeA = parseInt(a.contentLength || 0);
-      const sizeB = parseInt(b.contentLength || 0);
-      return sizeB - sizeA;
-    });
-
-  return { videoFormats, audioFormats };
+  }
 }
 
 const router = express.Router();
@@ -166,7 +129,7 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: '缺少视频ID参数' });
     }
 
-    const info = await getVideoInfo(videoId);
+    const info = await retry(() => getVideoInfo(videoId));
     res.json(info);
   } catch (error) {
     console.error('处理请求失败:', error);
