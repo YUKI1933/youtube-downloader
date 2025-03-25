@@ -1,5 +1,5 @@
 // api/download.js
-const youtubedl = require('youtube-dl-exec');
+const ytdlp = require('yt-dlp');
 
 /**
  * 获取视频信息的重试函数
@@ -27,7 +27,7 @@ async function getVideoInfo(videoId) {
   return retry(async () => {
     try {
       const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-      const info = await youtubedl(videoUrl, {
+      const info = await ytdlp.getInfo(videoUrl, {
         dumpSingleJson: true,
         noWarnings: true,
         noCallHome: true,
