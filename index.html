@@ -307,12 +307,16 @@
             }
 
             // 调用API解析视频
-            const response = await fetch(`/api/download?url=${encodeURIComponent(videoUrl)}&action=analyze`, {
-                method: 'GET',
+            const response = await fetch('/api/download', {
+                method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    url: videoUrl,
+                    action: 'analyze'
+                })
             });
 
             if (!response.ok) {
@@ -320,9 +324,11 @@
             }
 
             const data = await response.json();
-            window.parsedData = data; // 存储解析数据
-            
-            // 默认显示视频标签内容
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            window.parsedData = data;
             showContentTab('video');
             
         } catch (error) {
@@ -350,9 +356,6 @@
             return;
         }
 
-        console.log('当前标签:', tab);
-        console.log('解析数据:', data);
-
         let content = '';
         
         switch (tab) {
@@ -370,10 +373,10 @@
                                     </div>
                                     <div class="flex items-center gap-4">
                                         <span class="text-gray-500">${(format.size / (1024 * 1024)).toFixed(1)} MB</span>
-                                        <button onclick="startDownload('${format.url}', '${data.title}-${format.quality}.mp4')"
+                                        <a href="${format.url}" target="_blank" 
                                            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
                                             下载
-                                        </button>
+                                        </a>
                                     </div>
                                 </div>
                             `).join('')}
@@ -389,10 +392,10 @@
                                     </div>
                                     <div class="flex items-center gap-4">
                                         <span class="text-gray-500">${(format.size / (1024 * 1024)).toFixed(1)} MB</span>
-                                        <button onclick="startDownload('${format.url}', '${data.title}-audio.m4a')"
+                                        <a href="${format.url}" target="_blank"
                                            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
                                             下载
-                                        </button>
+                                        </a>
                                     </div>
                                 </div>
                             `).join('')}
