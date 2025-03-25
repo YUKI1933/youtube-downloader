@@ -1,5 +1,5 @@
 // api/download.js
-const ytdl = require('ytdl-core');
+const axios = require('axios');
 
 /**
  * 获取视频信息的重试函数
@@ -26,53 +26,55 @@ async function retry(fn, retries = 3, delay = 1000) {
 async function getVideoInfo(videoId) {
   return retry(async () => {
     try {
-      const info = await ytdl.getInfo(videoId, {
-        requestOptions: {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-            'accept-encoding': 'gzip, deflate, br',
-            'accept-language': 'en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7',
-            'cache-control': 'max-age=0',
-            'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-            'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': '"Windows"',
-            'sec-fetch-dest': 'document',
-            'sec-fetch-mode': 'navigate',
-            'sec-fetch-site': 'none',
-            'sec-fetch-user': '?1',
-            'upgrade-insecure-requests': '1',
-            'referer': `https://www.youtube.com/watch?v=${videoId}`,
-            'origin': 'https://www.youtube.com'
-          },
-          timeout: 10000
+      const response = await axios.get(`https://www.youtube.com/watch?v=${videoId}`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'accept-encoding': 'gzip, deflate, br',
+          'accept-language': 'en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7',
+          'cache-control': 'max-age=0',
+          'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+          'sec-ch-ua-mobile': '?0',
+          'sec-ch-ua-platform': '"Windows"',
+          'sec-fetch-dest': 'document',
+          'sec-fetch-mode': 'navigate',
+          'sec-fetch-site': 'none',
+          'sec-fetch-user': '?1',
+          'upgrade-insecure-requests': '1'
         }
       });
 
-      // 处理格式信息
-      const formats = info.formats.map(format => {
-        // 为URL添加额外参数
-        if (format.url) {
-          const url = new URL(format.url);
-          url.searchParams.set('has_verified', '1');
-          format.url = url.toString();
-        }
-        return format;
-      });
+      // 提取视频信息
+      const ytInitialData = response.data.match(/ytInitialData\s*=\s*({.+?})\s*;/)?.[1];
+      if (!ytInitialData) {
+        throw new Error('无法获取视频信息');
+      }
+
+      const data = JSON.parse(ytInitialData);
+      const videoDetails = data.contents?.twoColumnWatchNextResults?.results?.results?.contents?.[0]?.videoPrimaryInfoRenderer;
+      const formats = data.streamingData?.formats || [];
+      const adaptiveFormats = data.streamingData?.adaptiveFormats || [];
+
+      if (!videoDetails) {
+        throw new Error('无法获取视频详情');
+      }
+
+      // 合并所有格式
+      const allFormats = [...formats, ...adaptiveFormats].map(format => ({
+        itag: format.itag,
+        mimeType: format.mimeType,
+        quality: format.qualityLabel || format.quality,
+        hasAudio: format.mimeType?.includes('audio'),
+        hasVideo: format.mimeType?.includes('video'),
+        contentLength: format.contentLength,
+        url: format.url
+      }));
 
       return {
-        title: info.videoDetails.title,
-        formats: formats.map(format => ({
-          itag: format.itag,
-          mimeType: format.mimeType,
-          quality: format.qualityLabel || format.quality,
-          hasAudio: format.hasAudio,
-          hasVideo: format.hasVideo,
-          contentLength: format.contentLength,
-          url: format.url
-        })),
-        thumbnail: info.videoDetails.thumbnails[info.videoDetails.thumbnails.length - 1].url,
-        description: info.videoDetails.description
+        title: videoDetails.title?.runs?.[0]?.text || '未知标题',
+        formats: allFormats,
+        thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+        description: videoDetails.description?.runs?.[0]?.text || ''
       };
     } catch (error) {
       console.error('Error getting video info:', error);
