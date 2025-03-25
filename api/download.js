@@ -1,53 +1,84 @@
 // api/download.js
 const ytdl = require('ytdl-core');
 
-// 获取视频信息
-async function getVideoInfo(videoId) {
+/**
+ * 获取视频信息的重试函数
+ * @param {Function} fn - 要重试的异步函数
+ * @param {number} retries - 重试次数
+ * @param {number} delay - 重试延迟(ms)
+ * @returns {Promise} 
+ */
+async function retry(fn, retries = 3, delay = 1000) {
   try {
-    const info = await ytdl.getInfo(videoId, {
-      requestOptions: {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36',
-          'accept': '*/*',
-          'accept-encoding': 'gzip, deflate',
-          'accept-language': 'en-US,en;q=0.9',
-          'cache-control': 'no-cache',
-          'pragma': 'no-cache',
-          'referer': 'https://www.youtube.com/watch?v=' + videoId,
-          'origin': 'https://www.youtube.com'
-        }
-      }
-    });
-
-    // 处理格式信息
-    const formats = info.formats.map(format => {
-      // 为URL添加额外参数
-      if (format.url) {
-        const url = new URL(format.url);
-        url.searchParams.set('has_verified', '1');
-        format.url = url.toString();
-      }
-      return format;
-    });
-
-    return {
-      title: info.videoDetails.title,
-      formats: formats.map(format => ({
-        itag: format.itag,
-        mimeType: format.mimeType,
-        quality: format.qualityLabel || format.quality,
-        hasAudio: format.hasAudio,
-        hasVideo: format.hasVideo,
-        contentLength: format.contentLength,
-        url: format.url
-      })),
-      thumbnail: info.videoDetails.thumbnails[info.videoDetails.thumbnails.length - 1].url,
-      description: info.videoDetails.description
-    };
+    return await fn();
   } catch (error) {
-    console.error('Error getting video info:', error);
-    throw error;
+    if (retries <= 0) throw error;
+    await new Promise(resolve => setTimeout(resolve, delay));
+    return retry(fn, retries - 1, delay * 2);
   }
+}
+
+/**
+ * 获取视频信息
+ * @param {string} videoId - YouTube视频ID
+ * @returns {Promise<Object>} 视频信息
+ */
+async function getVideoInfo(videoId) {
+  return retry(async () => {
+    try {
+      const info = await ytdl.getInfo(videoId, {
+        requestOptions: {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'accept-encoding': 'gzip, deflate, br',
+            'accept-language': 'en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7',
+            'cache-control': 'max-age=0',
+            'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-fetch-dest': 'document',
+            'sec-fetch-mode': 'navigate',
+            'sec-fetch-site': 'none',
+            'sec-fetch-user': '?1',
+            'upgrade-insecure-requests': '1',
+            'referer': `https://www.youtube.com/watch?v=${videoId}`,
+            'origin': 'https://www.youtube.com'
+          },
+          timeout: 10000
+        }
+      });
+
+      // 处理格式信息
+      const formats = info.formats.map(format => {
+        // 为URL添加额外参数
+        if (format.url) {
+          const url = new URL(format.url);
+          url.searchParams.set('has_verified', '1');
+          format.url = url.toString();
+        }
+        return format;
+      });
+
+      return {
+        title: info.videoDetails.title,
+        formats: formats.map(format => ({
+          itag: format.itag,
+          mimeType: format.mimeType,
+          quality: format.qualityLabel || format.quality,
+          hasAudio: format.hasAudio,
+          hasVideo: format.hasVideo,
+          contentLength: format.contentLength,
+          url: format.url
+        })),
+        thumbnail: info.videoDetails.thumbnails[info.videoDetails.thumbnails.length - 1].url,
+        description: info.videoDetails.description
+      };
+    } catch (error) {
+      console.error('Error getting video info:', error);
+      throw error;
+    }
+  });
 }
 
 // 过滤并分类格式
