@@ -282,284 +282,202 @@
         }
     });
 
-    // 直接解析视频
+    // 解析视频函数
     async function analyzeVideoDirectly() {
-        // 获取登录状态
-        const token = localStorage.getItem('auth_token');
-        const username = localStorage.getItem('username');
-        
-        if (!token || !username) {
-            alert('请先登录后使用');
-            window.location.href = 'login.html';
-            return;
-        }
-        
         const urlInput = document.getElementById('urlInput');
-        const resultDiv = document.getElementById('result');
-        const videoInfoDiv = document.getElementById('videoInfo');
-        const url = urlInput.value.trim();
-        
-        if (!url) {
-            alert('请输入YouTube URL');
+        const videoUrl = urlInput.value.trim();
+        const result = document.getElementById('result');
+        const videoInfo = document.getElementById('videoInfo');
+
+        if (!videoUrl) {
+            alert('请输入YouTube视频链接');
             return;
         }
-        
-        // 显示加载状态
-        resultDiv.classList.remove('hidden');
-        videoInfoDiv.innerHTML = '<div class="text-center py-8"><div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div><p class="mt-4 text-gray-600">视频解析中，请稍候...</p></div>';
-        
-        // 默认激活视频标签
-        document.querySelectorAll('.tab-button').forEach(btn => {
-            btn.classList.remove('tab-active');
-        });
-        document.querySelector('.tab-button[data-tab="video"]').classList.add('tab-active');
-        
+
         try {
-            // 发送请求到API端点
-            const response = await fetch(`/api/download?url=${encodeURIComponent(url)}&action=analyze`, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            });
-            
-            if (!response.ok) {
-                throw new Error(`服务器响应错误: ${response.status}`);
+            // 显示加载状态
+            videoInfo.innerHTML = '<div class="text-center py-4">正在解析中，请稍候...</div>';
+            result.classList.remove('hidden');
+
+            // 获取认证token
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                alert('请先登录');
+                return;
             }
-            
+
+            // 调用API解析视频
+            const response = await fetch(`/api/download?url=${encodeURIComponent(videoUrl)}&action=analyze`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
             const data = await response.json();
-            console.log('解析结果:', data);
+            window.parsedData = data; // 存储解析数据
             
-            // 保存解析数据到全局变量
-            window.parsedData = data;
-            
-            // 显示视频标签内容
+            // 默认显示视频标签内容
             showContentTab('video');
+            
         } catch (error) {
-            console.error('解析错误:', error);
-            videoInfoDiv.innerHTML = `<div class="text-center py-8 text-red-500"><p>解析失败: ${error.message}</p></div>`;
+            console.error('Error:', error);
+            videoInfo.innerHTML = `<div class="text-red-500 py-4">解析失败: ${error.message}</div>`;
         }
     }
 
-    // 显示不同标签的内容
+    // 显示内容标签
     function showContentTab(tab) {
-        if (!window.parsedData) {
-            console.log("没有解析数据");
+        // 更新标签样式
+        document.querySelectorAll('.tab-button').forEach(button => {
+            if (button.dataset.tab === tab) {
+                button.classList.add('tab-active');
+            } else {
+                button.classList.remove('tab-active');
+            }
+        });
+
+        const videoInfo = document.getElementById('videoInfo');
+        const data = window.parsedData;
+
+        if (!data) {
+            videoInfo.innerHTML = '<div class="text-center py-4">暂无数据</div>';
             return;
         }
+
+        console.log('当前标签:', tab);
+        console.log('解析数据:', data);
+
+        let content = '';
         
-        console.log("当前标签:", tab, "数据:", window.parsedData);
-        
-        // 移除所有标签的活跃状态
-        document.querySelectorAll('.tab-button').forEach(btn => {
-            btn.classList.remove('tab-active');
-        });
-        
-        // 添加当前标签的活跃状态
-        document.querySelector(`.tab-button[data-tab="${tab}"]`).classList.add('tab-active');
-        
-        const videoInfoEl = document.getElementById('videoInfo');
-        videoInfoEl.innerHTML = '';
-        
-        if (tab === 'video') {
-            // 视频标签内容
-            const videoFormats = window.parsedData.formats.video || [];
-            const audioFormats = window.parsedData.formats.audio || [];
-            
-            if (videoFormats.length > 0 || audioFormats.length > 0) {
-                // 视频下载选项
-                if (videoFormats.length > 0) {
-                    const videoTitle = document.createElement('h3');
-                    videoTitle.className = 'font-semibold text-lg mb-2';
-                    videoTitle.textContent = '视频下载选项';
-                    videoInfoEl.appendChild(videoTitle);
-                    
-                    videoFormats.forEach(format => {
-                        const formatSize = format.size ? `${Math.round(format.size / 1024 / 1024)}MB` : '未知大小';
-                        const qualityText = format.quality || '标准质量';
+        switch (tab) {
+            case 'video':
+                content = `
+                    <h3 class="text-xl font-semibold mb-4">${data.title || '未知标题'}</h3>
+                    <div class="grid gap-4">
+                        ${data.formats.video && data.formats.video.length > 0 ? `
+                            <div class="font-semibold">视频下载选项：</div>
+                            ${data.formats.video.map(format => `
+                                <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
+                                    <div>
+                                        <span class="font-medium">${format.quality}</span>
+                                        <span class="text-gray-500 text-sm ml-2">${format.mimeType.split(';')[0]}</span>
+                                    </div>
+                                    <div class="flex items-center gap-4">
+                                        <span class="text-gray-500">${(format.size / (1024 * 1024)).toFixed(1)} MB</span>
+                                        <button onclick="startDownload('${format.url}', '${data.title}-${format.quality}.mp4')"
+                                           class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                                            下载
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        ` : '<div class="text-center text-gray-500">没有可用的视频格式</div>'}
                         
-                        const downloadDiv = document.createElement('div');
-                        downloadDiv.className = 'mb-2 p-2 border border-gray-200 rounded hover:bg-gray-50 flex justify-between items-center';
-                        
-                        const qualitySpan = document.createElement('span');
-                        qualitySpan.textContent = `${qualityText} - ${formatSize}`;
-                        downloadDiv.appendChild(qualitySpan);
-                        
-                        const downloadBtn = document.createElement('a');
-                        downloadBtn.className = 'px-4 py-1 bg-blue-500 text-white rounded hover:bg-blue-600';
-                        downloadBtn.textContent = '下载';
-                        downloadBtn.href = format.url;
-                        downloadBtn.setAttribute('target', '_blank');
-                        
-                        downloadDiv.appendChild(downloadBtn);
-                        videoInfoEl.appendChild(downloadDiv);
-                    });
-                }
+                        ${data.formats.audio && data.formats.audio.length > 0 ? `
+                            <div class="font-semibold mt-4">音频下载选项：</div>
+                            ${data.formats.audio.map(format => `
+                                <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
+                                    <div>
+                                        <span class="font-medium">音频</span>
+                                        <span class="text-gray-500 text-sm ml-2">${format.mimeType.split(';')[0]}</span>
+                                    </div>
+                                    <div class="flex items-center gap-4">
+                                        <span class="text-gray-500">${(format.size / (1024 * 1024)).toFixed(1)} MB</span>
+                                        <button onclick="startDownload('${format.url}', '${data.title}-audio.m4a')"
+                                           class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                                            下载
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        ` : '<div class="text-center text-gray-500">没有可用的音频格式</div>'}
+                    </div>
+                `;
+                break;
                 
-                // 音频下载选项
-                if (audioFormats.length > 0) {
-                    const audioTitle = document.createElement('h3');
-                    audioTitle.className = 'font-semibold text-lg mb-2 mt-4';
-                    audioTitle.textContent = '音频下载选项';
-                    videoInfoEl.appendChild(audioTitle);
-                    
-                    audioFormats.forEach(format => {
-                        const formatSize = format.size ? `${Math.round(format.size / 1024 / 1024)}MB` : '未知大小';
-                        
-                        const downloadDiv = document.createElement('div');
-                        downloadDiv.className = 'mb-2 p-2 border border-gray-200 rounded hover:bg-gray-50 flex justify-between items-center';
-                        
-                        const qualitySpan = document.createElement('span');
-                        qualitySpan.textContent = `音频 - ${formatSize}`;
-                        downloadDiv.appendChild(qualitySpan);
-                        
-                        const downloadBtn = document.createElement('a');
-                        downloadBtn.className = 'px-4 py-1 bg-blue-500 text-white rounded hover:bg-blue-600';
-                        downloadBtn.textContent = '下载';
-                        downloadBtn.href = format.url;
-                        downloadBtn.setAttribute('target', '_blank');
-                        
-                        downloadDiv.appendChild(downloadBtn);
-                        videoInfoEl.appendChild(downloadDiv);
-                    });
-                }
-            } else {
-                videoInfoEl.innerHTML = '<p class="text-center text-gray-500 py-4">没有可用的下载选项</p>';
-            }
-        } else if (tab === 'image') {
-            // 图片标签内容
-            if (window.parsedData.thumbnail) {
-                const img = document.createElement('img');
-                img.src = window.parsedData.thumbnail;
-                img.className = 'max-w-full h-auto mx-auto';
-                img.alt = window.parsedData.title || 'Video Thumbnail';
+            case 'image':
+                content = `
+                    <div class="text-center">
+                        ${data.thumbnail ? `
+                            <img src="${data.thumbnail}" alt="${data.title || '视频缩略图'}" class="max-w-full h-auto mx-auto rounded-lg shadow-lg">
+                            <div class="mt-4">
+                                <a href="${data.thumbnail}" 
+                                   download="thumbnail.jpg" 
+                                   target="_blank" 
+                                   class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                                    下载缩略图
+                                </a>
+                            </div>
+                        ` : '<div class="text-gray-500">没有可用的缩略图</div>'}
+                    </div>
+                `;
+                break;
                 
-                const downloadDiv = document.createElement('div');
-                downloadDiv.className = 'text-center mt-4';
-                
-                const downloadBtn = document.createElement('a');
-                downloadBtn.className = 'px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 inline-block';
-                downloadBtn.textContent = '下载缩略图';
-                downloadBtn.href = window.parsedData.thumbnail;
-                downloadBtn.setAttribute('download', '');
-                downloadBtn.setAttribute('target', '_blank');
-                
-                downloadDiv.appendChild(downloadBtn);
-                
-                videoInfoEl.appendChild(img);
-                videoInfoEl.appendChild(downloadDiv);
-            } else {
-                videoInfoEl.innerHTML = '<p class="text-center text-gray-500 py-4">暂无图片</p>';
-            }
-        } else if (tab === 'text') {
-            // 文本标签内容
-            const titleEl = document.createElement('h2');
-            titleEl.className = 'text-xl font-bold mb-4';
-            titleEl.textContent = window.parsedData.title || '无标题';
-            
-            const descEl = document.createElement('p');
-            descEl.className = 'text-gray-700 whitespace-pre-line';
-            descEl.textContent = window.parsedData.description || '无描述';
-            
-            videoInfoEl.appendChild(titleEl);
-            videoInfoEl.appendChild(descEl);
+            case 'text':
+                content = `
+                    <div class="space-y-4">
+                        <h3 class="text-xl font-semibold">${data.title || '未知标题'}</h3>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="whitespace-pre-wrap text-gray-700">${data.description || '没有可用的描述'}</p>
+                        </div>
+                    </div>
+                `;
+                break;
         }
+        
+        videoInfo.innerHTML = content;
     }
-    
-    // 添加视频下载函数
-    function downloadVideo(url, filename) {
-        // 显示下载进度
-        const progressDiv = document.createElement('div');
-        progressDiv.className = 'fixed top-0 left-0 w-full h-full bg-black bg-opacity-50 flex items-center justify-center z-50';
-        progressDiv.innerHTML = `
-            <div class="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-                <h3 class="text-lg font-semibold mb-4">正在下载: ${filename}</h3>
-                <div class="w-full bg-gray-200 rounded-full h-4 mb-4">
-                    <div id="download-progress-bar" class="bg-blue-600 h-4 rounded-full" style="width: 0%"></div>
-                </div>
-                <p id="download-progress-text" class="text-center">准备下载...</p>
-                <button id="cancel-download" class="mt-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 w-full">取消</button>
-            </div>
-        `;
-        document.body.appendChild(progressDiv);
-        
-        const progressBar = document.getElementById('download-progress-bar');
-        const progressText = document.getElementById('download-progress-text');
-        const cancelButton = document.getElementById('cancel-download');
-        
-        let abortController = new AbortController();
-        let signal = abortController.signal;
-        
-        cancelButton.addEventListener('click', () => {
-            abortController.abort();
-            document.body.removeChild(progressDiv);
-        });
-        
-        // 开始下载
-        fetch(url, { signal })
-            .then(response => {
-                if (!response.ok) throw new Error(`下载失败: ${response.status} ${response.statusText}`);
-                
-                const contentLength = response.headers.get('content-length');
-                const total = contentLength ? parseInt(contentLength, 10) : 0;
-                let loaded = 0;
-                
-                const reader = response.body.getReader();
-                const chunks = [];
-                
-                return new Promise((resolve, reject) => {
-                    function pump() {
-                        reader.read().then(({ done, value }) => {
-                            if (done) {
-                                resolve(new Blob(chunks));
-                                return;
-                            }
-                            
-                            chunks.push(value);
-                            loaded += value.length;
-                            
-                            if (total) {
-                                const percent = Math.round((loaded / total) * 100);
-                                progressBar.style.width = `${percent}%`;
-                                progressText.textContent = `${percent}% (${(loaded / 1024 / 1024).toFixed(1)}MB / ${(total / 1024 / 1024).toFixed(1)}MB)`;
-                            } else {
-                                progressText.textContent = `已下载 ${(loaded / 1024 / 1024).toFixed(1)}MB`;
-                            }
-                            
-                            pump();
-                        }).catch(reject);
-                    }
-                    
-                    pump();
-                });
-            })
-            .then(blob => {
-                // 创建下载链接并点击
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                
-                // 清理
-                setTimeout(() => {
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    document.body.removeChild(progressDiv);
-                }, 100);
-            })
-            .catch(error => {
-                if (error.name === 'AbortError') {
-                    console.log('下载已取消');
-                } else {
-                    alert(`下载失败: ${error.message}`);
-                    console.error('下载错误:', error);
-                }
-                try {
-                    document.body.removeChild(progressDiv);
-                } catch (e) {}
+
+    // 添加下载函数
+    async function startDownload(url, filename) {
+        try {
+            // 获取认证token
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                alert('请先登录');
+                return;
+            }
+
+            // 创建下载链接
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.target = '_blank';
+            
+            // 添加认证头
+            const headers = new Headers({
+                'Authorization': `Bearer ${token}`
             });
+            
+            // 发起请求
+            const response = await fetch(url, { headers });
+            if (!response.ok) throw new Error('下载失败');
+            
+            // 获取blob
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            
+            // 设置下载链接
+            a.href = blobUrl;
+            
+            // 触发下载
+            document.body.appendChild(a);
+            a.click();
+            
+            // 清理
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+            
+        } catch (error) {
+            console.error('下载错误:', error);
+            alert('下载失败: ' + error.message);
+        }
     }
     </script>
     <script src="auth.js"></script>
