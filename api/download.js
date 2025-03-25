@@ -1,8 +1,8 @@
 // api/download.js
 const ytdl = require('@distube/ytdl-core');
 
-// 禁用调试文件写入
-ytdl.setWriteDebugFile(false);
+// 设置环境变量禁用调试
+process.env.YTDL_NO_DEBUG = 'true';
 
 /**
  * 代理服务器列表
