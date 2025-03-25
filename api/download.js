@@ -84,13 +84,15 @@ async function getVideoInfo(videoId) {
 
       // 创建innertube客户端
       const client = {
-        clientName: 'ANDROID',
-        clientVersion: '18.11.34',
-        androidSdkVersion: 30,
-        userAgent: 'com.google.android.youtube/18.11.34 (Linux; U; Android 11) gzip',
+        clientName: 'IOS',
+        clientVersion: '18.49.3',
+        deviceModel: 'iPhone14,3',
+        userAgent: 'com.google.ios.youtube/18.49.3 (iPhone14,3; U; CPU iOS 16_0 like Mac OS X)',
         hl: 'zh-CN',
         gl: 'US',
-        utcOffsetMinutes: -new Date().getTimezoneOffset()
+        platform: 'MOBILE',
+        utcOffsetMinutes: -new Date().getTimezoneOffset(),
+        visitorData: process.env.VISITOR_DATA || undefined
       };
 
       // 获取视频信息
@@ -99,8 +101,13 @@ async function getVideoInfo(videoId) {
           headers: {
             'User-Agent': client.userAgent,
             'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-            'x-youtube-client-name': '3',
-            'x-youtube-client-version': client.clientVersion
+            'x-youtube-client-name': '5',
+            'x-youtube-client-version': client.clientVersion,
+            'x-youtube-device': client.deviceModel,
+            'x-youtube-page-cl': 'null',
+            'x-youtube-page-label': 'youtube.mobile.main',
+            'x-youtube-utc-offset': client.utcOffsetMinutes.toString(),
+            'x-youtube-variants-checksum': 'null'
           }
         },
         client
