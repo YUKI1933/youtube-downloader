@@ -51,27 +51,28 @@ async function initializePlayDl() {
       process.env.HTTP_PROXY = proxyConfig;
     }
 
-    // 设置innertube密钥
-    await playdl.setToken({
-      youtube: {
-        cookie: process.env.YOUTUBE_COOKIE,
-        innertube: {
-          api_key: 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8',
-          context: {
-            client: {
-              clientName: 'WEB',
-              clientVersion: '2.20240215.01.00',
-              hl: 'zh-CN',
-              gl: 'CN',
-              utcOffsetMinutes: 480
-            }
-          }
+    // 设置YouTube cookie
+    const cookie = process.env.YOUTUBE_COOKIE;
+    if (cookie) {
+      // 解析cookie字符串
+      const cookies = cookie.split(';').reduce((acc, curr) => {
+        const [name, value] = curr.trim().split('=');
+        if (name && value) {
+          acc[name] = value;
         }
-      }
-    });
-    console.log('YouTube认证设置成功');
+        return acc;
+      }, {});
+
+      await playdl.setToken({
+        youtubeCookies: cookies
+      });
+      console.log('YouTube cookie设置成功');
+    } else {
+      console.log('未设置YouTube cookie，使用匿名访问');
+    }
   } catch (error) {
     console.error('初始化play-dl失败:', error);
+    throw error; // 抛出错误以便上层捕获
   }
 }
 
