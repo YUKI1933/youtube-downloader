@@ -1,49 +1,22 @@
 // api/download.js
-const youtubedl = require('youtube-dl-exec');
-const path = require('path');
-const fs = require('fs');
-
-/**
- * 检查yt-dlp二进制文件是否存在
- * @returns {boolean} 是否存在
- */
-function checkYtDlpBinary() {
-  const ytDlpPath = path.join(__dirname, '..', 'bin', 'yt-dlp');
-  return fs.existsSync(ytDlpPath);
-}
+const playdl = require('play-dl');
 
 /**
  * 代理服务器列表
- * @type {Array<{protocol: string, host: string, port: string}>}
+ * @type {Array<string>}
  */
 const PROXY_SERVERS = [
-  {
-    protocol: 'http',
-    host: '51.159.115.233',
-    port: '3128'
-  },
-  {
-    protocol: 'http',
-    host: '165.225.208.243',
-    port: '10605'
-  },
-  {
-    protocol: 'http',
-    host: '165.225.208.77',
-    port: '10605'
-  },
-  {
-    protocol: 'http',
-    host: '165.225.208.84',
-    port: '10605'
-  }
+  'http://51.159.115.233:3128',
+  'http://165.225.208.243:10605',
+  'http://165.225.208.77:10605',
+  'http://165.225.208.84:10605'
 ];
 
 let currentProxyIndex = 0;
 
 /**
  * 获取下一个代理服务器
- * @returns {Object} 代理配置对象
+ * @returns {string} 代理服务器URL
  */
 function getNextProxy() {
   const proxy = PROXY_SERVERS[currentProxyIndex];
@@ -53,26 +26,13 @@ function getNextProxy() {
 
 /**
  * 获取代理配置
- * @returns {Object|null} 代理配置对象
+ * @returns {string|null} 代理服务器URL
  */
 function getProxyConfig() {
   // 优先使用环境变量中的代理配置
   const proxyUrl = process.env.PROXY_URL;
   if (proxyUrl) {
-    try {
-      const url = new URL(proxyUrl);
-      return {
-        protocol: url.protocol.replace(':', ''),
-        host: url.hostname,
-        port: url.port,
-        auth: url.username && url.password ? {
-          username: url.username,
-          password: url.password
-        } : undefined
-      };
-    } catch (error) {
-      console.error('代理配置解析错误:', error);
-    }
+    return proxyUrl;
   }
 
   // 如果没有环境变量配置,使用代理服务器列表
@@ -91,6 +51,7 @@ async function retry(fn, retries = 3, delay = 1000) {
     return await fn();
   } catch (error) {
     if (retries <= 0) throw error;
+    console.log(`重试请求，剩余重试次数: ${retries-1}`);
     await new Promise(resolve => setTimeout(resolve, delay));
     return retry(fn, retries - 1, delay * 2);
   }
@@ -104,76 +65,54 @@ async function retry(fn, retries = 3, delay = 1000) {
 async function getVideoInfo(videoId) {
   return retry(async () => {
     try {
-      // 检查yt-dlp二进制文件
-      if (!checkYtDlpBinary()) {
-        throw new Error('yt-dlp二进制文件不存在，请确保postinstall脚本已运行');
-      }
-
       const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-      const ytDlpPath = path.join(__dirname, '..', 'bin', 'yt-dlp');
       
       // 获取代理配置
       const proxyConfig = getProxyConfig();
       
-      // 构建yt-dlp选项
-      const options = {
-        dumpSingleJson: true,
-        noWarnings: true,
-        noCallHome: true,
-        noCheckCertificate: true,
-        preferFreeFormats: true,
-        youtubeSkipDashManifest: true,
-        format: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-        binary: ytDlpPath,
-        extractorRetries: 3,
-        socketTimeout: 30000,
-        retries: 3,
-        fragmentRetries: 3,
-        fileAccessRetries: 3,
-        retrySleep: 5,
-        fragmentRetrySleep: 5,
-        maxSleepInterval: 5,
-        sleepInterval: 5,
-        maxSleepIntervalCap: 5,
-        sleepIntervalCap: 5,
-        sleepIntervalRequests: 3
-      };
+      // 记录代理配置
+      console.log('使用代理:', proxyConfig);
 
-      // 如果存在代理配置,添加到选项中
+      // 配置代理
       if (proxyConfig) {
-        options.proxy = proxyConfig.protocol + '://' + 
-          (proxyConfig.auth ? `${proxyConfig.auth.username}:${proxyConfig.auth.password}@` : '') +
-          `${proxyConfig.host}:${proxyConfig.port}`;
+        playdl.setProxy(proxyConfig);
       }
 
-      console.log('使用配置:', {
-        ...options,
-        proxy: options.proxy ? '已配置' : '未配置',
-        binary: ytDlpPath
-      });
+      // 验证视频URL
+      const validateResult = await playdl.validate(videoUrl);
+      if (validateResult !== 'youtube') {
+        throw new Error(`不支持的URL类型: ${validateResult}`);
+      }
 
-      const info = await youtubedl(videoUrl, options);
-
-      if (!info || !info.formats) {
+      // 获取视频信息
+      const videoInfo = await playdl.video_info(videoUrl);
+      
+      if (!videoInfo) {
         throw new Error('无法获取视频信息');
       }
 
-      // 处理格式信息
-      const formats = info.formats.map(format => ({
-        itag: format.format_id,
-        mimeType: format.ext ? `video/${format.ext}` : format.acodec ? 'audio/mp4' : 'video/mp4',
-        quality: format.height ? `${format.height}p` : format.quality || 'Audio',
-        hasAudio: !!format.acodec,
-        hasVideo: !!format.vcodec,
-        contentLength: format.filesize,
-        url: format.url
-      }));
+      const videoDetails = videoInfo.video_details;
+      const formats = videoInfo.format;
+
+      // 构建格式数组
+      const processedFormats = formats.map(format => {
+        // 使用视频信息构建下载URL
+        return {
+          itag: format.itag,
+          mimeType: format.mimeType || (format.audioQuality ? 'audio/mp4' : 'video/mp4'),
+          quality: format.qualityLabel || (format.audioQuality || 'Audio'),
+          hasAudio: !!format.audioQuality,
+          hasVideo: !!format.qualityLabel,
+          contentLength: format.contentLength,
+          url: format.url
+        };
+      });
 
       return {
-        title: info.title,
-        formats: formats,
-        thumbnail: info.thumbnail,
-        description: info.description
+        title: videoDetails.title,
+        formats: processedFormats,
+        thumbnail: videoDetails.thumbnails[videoDetails.thumbnails.length - 1].url,
+        description: videoDetails.description || ''
       };
     } catch (error) {
       console.error('获取视频信息失败:', error);
@@ -184,11 +123,8 @@ async function getVideoInfo(videoId) {
 
 // 过滤并分类格式
 function processFormats(formats) {
-  // 仅保留MP4视频和M4A音频
-  const filteredFormats = formats.filter(format => {
-    const mimeType = format.mimeType || '';
-    return (mimeType.includes('mp4') || mimeType.includes('m4a')) && format.url;
-  });
+  // 仅保留有效URL的格式
+  const filteredFormats = formats.filter(format => format.url);
 
   // 分类格式
   const videoFormats = filteredFormats
