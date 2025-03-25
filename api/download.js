@@ -4,7 +4,15 @@ const ytdl = require('ytdl-core');
 // 获取视频信息
 async function getVideoInfo(videoId) {
   try {
-    const info = await ytdl.getInfo(videoId);
+    const info = await ytdl.getInfo(videoId, {
+      requestOptions: {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+        }
+      }
+    });
     return {
       title: info.videoDetails.title,
       formats: info.formats.map(format => ({
@@ -143,7 +151,15 @@ module.exports = async (req, res) => {
           return res.status(400).json({ error: '请提供itag参数' });
         }
 
-        const info = await ytdl.getInfo(videoId);
+        const info = await ytdl.getInfo(videoId, {
+          requestOptions: {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.5',
+            }
+          }
+        });
         const format = info.formats.find(f => f.itag.toString() === itag.toString());
         
         if (!format) {
