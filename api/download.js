@@ -1,4 +1,6 @@
 // api/download.js
+const { google } = require('googleapis');
+const axios = require('axios');
 const ytdl = require('@distube/ytdl-core');
 
 /**
@@ -76,16 +78,28 @@ async function getVideoInfo(videoId) {
         process.env.HTTP_PROXY = proxyConfig;
       }
 
+      // 创建innertube客户端
+      const client = {
+        clientName: 'ANDROID',
+        clientVersion: '18.11.34',
+        androidSdkVersion: 30,
+        userAgent: 'com.google.android.youtube/18.11.34 (Linux; U; Android 11) gzip',
+        hl: 'zh-CN',
+        gl: 'US',
+        utcOffsetMinutes: -new Date().getTimezoneOffset()
+      };
+
       // 获取视频信息
       const info = await ytdl.getInfo(videoUrl, {
-        lang: 'zh-CN',
         requestOptions: {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': client.userAgent,
             'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-            'Cookie': process.env.YOUTUBE_COOKIE || ''
+            'x-youtube-client-name': '3',
+            'x-youtube-client-version': client.clientVersion
           }
-        }
+        },
+        client
       });
       
       if (!info) {
