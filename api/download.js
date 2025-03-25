@@ -1,6 +1,4 @@
 // api/download.js
-const { google } = require('googleapis');
-const axios = require('axios');
 const ytdl = require('@distube/ytdl-core');
 
 /**
