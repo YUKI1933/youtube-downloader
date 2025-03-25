@@ -40,6 +40,35 @@ function getProxyConfig() {
 }
 
 /**
+ * 初始化play-dl
+ */
+async function initializePlayDl() {
+  try {
+    // 设置代理
+    const proxyConfig = getProxyConfig();
+    if (proxyConfig) {
+      process.env.HTTPS_PROXY = proxyConfig;
+      process.env.HTTP_PROXY = proxyConfig;
+    }
+
+    // 设置YouTube cookie
+    const cookie = process.env.YOUTUBE_COOKIE;
+    if (cookie) {
+      await playdl.setToken({
+        youtube: {
+          cookie: cookie
+        }
+      });
+      console.log('YouTube cookie设置成功');
+    } else {
+      console.log('未设置YouTube cookie，使用匿名访问');
+    }
+  } catch (error) {
+    console.error('初始化play-dl失败:', error);
+  }
+}
+
+/**
  * 获取视频信息的重试函数
  * @param {Function} fn - 要重试的异步函数
  * @param {number} retries - 重试次数
@@ -67,18 +96,8 @@ async function getVideoInfo(videoId) {
     try {
       const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
       
-      // 获取代理配置
-      const proxyConfig = getProxyConfig();
-      
-      // 记录代理配置
-      console.log('使用代理:', proxyConfig);
-
-      // 配置代理
-      if (proxyConfig) {
-        // 设置全局代理
-        process.env.HTTPS_PROXY = proxyConfig;
-        process.env.HTTP_PROXY = proxyConfig;
-      }
+      // 初始化play-dl
+      await initializePlayDl();
 
       // 验证视频URL
       const validateResult = await playdl.validate(videoUrl);
